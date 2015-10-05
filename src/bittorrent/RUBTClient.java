@@ -15,13 +15,23 @@ public class RUBTClient {
 			return;
 		}
 		
+		if(args[0] == null){
+			System.out.println(Errors.NULL_FILENAME);
+			return;
+		}
+		
 		try{
 			File torrent_file = new File(args[0]);
+			if(!torrent_file.exists()){
+				System.out.println(String.format(Errors.FILE_DOESNT_EXIST,args[0]));
+				return;
+			}
 			DataInputStream metaIn = new DataInputStream(
 					new FileInputStream(torrent_file));
-		}catch(Exception e){
+		}catch(Exception ne){
 			
 		}
+		
 		
 		
 	}
