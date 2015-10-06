@@ -1,12 +1,10 @@
 package bittorrent;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
 public class RUBTClient {
-
 
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
@@ -32,9 +30,7 @@ public class RUBTClient {
 			fileRead.read(byteArray);
 			fileRead.close();
 			torrent_info = new TorrentInfo(byteArray);
-			System.out.println(torrent_info.announce_url.toString());
-			System.out.println(torrent_info.file_name);
-			System.out.println(torrent_info.info_hash.array().toString());
+			
 		}catch(IOException ne){
 			System.out.println(String.format(Errors.FILE_DOESNT_EXIST,args[0]));
 			return;
@@ -43,7 +39,16 @@ public class RUBTClient {
 			return;
 		}
 		
+		Tracker tracker = new Tracker(torrent_info);
+		try {
+			tracker.makeGETRequest();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
+		System.out.println(torrent_info.announce_url.toString());
+		System.out.println(torrent_info.file_name);
 		
 	}
 
