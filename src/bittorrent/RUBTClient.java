@@ -1,8 +1,9 @@
 package bittorrent;
 
-import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 
 public class RUBTClient {
 
@@ -20,16 +21,26 @@ public class RUBTClient {
 			return;
 		}
 		
+		byte[] byteArray;
+		TorrentInfo torrent_info;
+		
 		try{
-			File torrent_file = new File(args[0]);
-			if(!torrent_file.exists()){
-				System.out.println(String.format(Errors.FILE_DOESNT_EXIST,args[0]));
-				return;
-			}
-			DataInputStream metaIn = new DataInputStream(
-					new FileInputStream(torrent_file));
-		}catch(Exception ne){
 			
+			File torrent_file = new File(args[0]);
+			RandomAccessFile fileRead = new RandomAccessFile(torrent_file,"r");
+			byteArray = new byte[(int) fileRead.length()];
+			fileRead.read(byteArray);
+			fileRead.close();
+			torrent_info = new TorrentInfo(byteArray);
+			System.out.println(torrent_info.announce_url.toString());
+			System.out.println(torrent_info.file_name);
+			System.out.println(torrent_info.info_hash.array().toString());
+		}catch(IOException ne){
+			System.out.println(String.format(Errors.FILE_DOESNT_EXIST,args[0]));
+			return;
+		} catch (BencodingException e) {
+			System.out.println(e.getMessage() + String.format(Errors.CORRUPT_FILE,args[0]));
+			return;
 		}
 		
 		
