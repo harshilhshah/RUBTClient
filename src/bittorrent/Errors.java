@@ -7,5 +7,6 @@ public interface Errors {
 	static final String FILE_DOESNT_EXIST  = "Error: The file %s doesn't exist. Please "
 			+ "provide a valid file path name";
 	static final String BAD_FILE = "Error: The file provided seems corrupted";
+	static final String CORRUPT_FILE = "Error: the file %s is corrupted.";
 	
 }
