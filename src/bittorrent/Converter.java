@@ -1,5 +1,10 @@
 package bittorrent;
 
+import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+
 public class Converter {
 	
 	/* copied. Gotta change this */
@@ -36,6 +41,36 @@ public class Converter {
 		final String hexString = new String(charArr);
 
 		return hexString;
+	}
+	
+	protected static String objectToStr(Object o){
+		
+		if(o instanceof Integer){
+			return String.valueOf(o);
+		} else if(o instanceof ByteBuffer){
+			try {
+				return new String(((ByteBuffer) o).array(),"ASCII");
+			} catch (UnsupportedEncodingException e) {
+				return o.toString();
+			}
+		}else if(o instanceof Map<?,?>){
+			
+			String retStr = "";
+			for (Object name: ((Map<?, ?>) o).keySet()){
+	            String value = objectToStr(((Map<?, ?>) o).get(name));  
+	            retStr += objectToStr(name) + ": " + value + "\n";  
+			} 
+			
+			return retStr;
+		}else if(o instanceof List){
+			
+			String retStr = "";
+			for(Object elem: (List<?>)o){
+				retStr += objectToStr(elem) + "\n";
+			}
+			return retStr;
+		}
+		return o.toString();
 	}
 
 }

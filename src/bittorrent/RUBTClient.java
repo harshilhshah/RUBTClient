@@ -9,17 +9,23 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
-public class RUBTClient implements Errors{
+public class RUBTClient {
+	
+	static final String INVALID_ARGS = "Error: Invalid number of arguments\n"
+			+ "\nUsage: java cp . RUBTClient <load_file> <storage_file>";
+	static final String NULL_FILENAME = "Error: Please provide a valid file path";
+	static final String FILE_DOESNT_EXIST  = "Error: The file %s doesn't exist. "
+			+ "\nPlease provide a valid file path name";
+	static final String CORRUPT_FILE = "Error: the file %s is corrupted.";
+	static final String INVALID_URL = "Error: An invalid url was formed. "
+			+ "\nCheck the contents of the file %s";
+	static final String GET_FAILED = "Error: The program failed to properly "
+			+ "execute HTTP GET request";
+	static final String NO_PEERS_FOUND = "Warning: No peers found in the response. Terminating ..";
 
-	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-		
-		
+	public static void main(String[] args) {			
 		
 		/* Checking error cases */
 		
@@ -55,7 +61,7 @@ public class RUBTClient implements Errors{
 		
 		
 		
-		/* Parsing the data in the file */
+		/* Creating parser which will parse info from torrent_info */
 		
 		Parser parser = new Parser(torrent_info);
 		
@@ -82,62 +88,30 @@ public class RUBTClient implements Errors{
 		} catch (IOException e) {
 			printError(GET_FAILED);
 		}
-
 		
 		System.out.println(torrent_info.announce_url.toString());
 		System.out.println(torrent_info.file_name);
 		
-		Map<ByteBuffer, Object> decode;
+		
+		
+		/* Decoding the tracker response in order to get list of peers */
+		List<Peer> peers = null;
 		try {
-			decode = (Map<ByteBuffer, Object>) Bencoder2.decode(byteArray);
-			decode = ((ArrayList<HashMap<ByteBuffer, Object>>) decode.values().toArray()[5]).get(0);
-			//printError(decode.keySet().toArray()[0].toString());
-			System.out.println(new String(((ByteBuffer)decode.keySet().toArray()[2]).array(),"ASCII"));
+			peers = parser.parseResponse(byteArray);
 		} catch (BencodingException | UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
+		if(peers == null)
+			printError(NO_PEERS_FOUND);
+		
+		
 	}
 	
 	public static void printError(String error_message){
 		System.out.println(error_message);
 		System.exit(1);
 	}
-	
-	/*public void makeGETRequest() throws MalformedURLException, IOException{
 		
-		String ip_addr = torrent_info.announce_url.toString();
-		info_hash = Converter.bytesToURL(torrent_info.info_hash.array());
-
-		String url = ip_addr + "?info_hash=" + info_hash + "&peer_id=" + peer_id 
-				+ "&port=" + port + "&uploaded=0&downloaded="
-				+ downloaded + "&left=" + left;
-
-		HttpURLConnection huc = (HttpURLConnection) new URL(url)
-				.openConnection();
-		huc.setRequestMethod("GET");
-		InputStream is = huc.getInputStream();
-		DataInputStream dis = new DataInputStream(is);
-		
-		
-		/*StringBuilder result = new StringBuilder();
-		BufferedReader rd = new BufferedReader(new InputStreamReader(is));
-	      String line;
-	      while ((line = rd.readLine()) != null) {
-	         result.append(line);
-	      }
-	      rd.close();
-	      System.out.println(result.toString());
-	
-	
-
-		int dataSize = huc.getContentLength();
-		byte[] retArray = new byte[dataSize];
-
-		dis.readFully(retArray);
-		//dis.close();
-		this.tracker_response = retArray;
-		
-	}*/
 
 }
