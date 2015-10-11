@@ -27,7 +27,7 @@ public class PeerMsg {
     private byte[] message;
     public final byte msgId;
     public final int lengthPrefix;
-
+    byte[] block;
     /**
      * Constructor for peer to send messages
      * @param lenPre
@@ -41,9 +41,17 @@ public class PeerMsg {
 
     }
 
+    /**
+     * returns the message array
+     * @return byte[]
+     */
     public byte[] getMessage(){
         return this.message;
     }
+
+    /**
+     * sets up the byte array for messages
+     */
     public void setMessage(){
         switch (msgId){
             case Choke:
@@ -78,6 +86,11 @@ public class PeerMsg {
         }
     }
 
+    /**
+     * Converts int to 4 byte big-endian
+     * @param value
+     * @return
+     */
     public static byte[] convertToByte(int value){
         ByteBuffer bb = ByteBuffer.allocate(4);
         bb.putInt(value);
@@ -85,8 +98,64 @@ public class PeerMsg {
         return bb.array();
     }
 
-    public void setPayload(){
+    /**
+     * Set payload of this message.
+     * @param payLoad
+     * @param block
+     * @param pieceStart
+     * @param pieceIndex
+     * @param reqLen
+     * @param reqStart
+     * @param reqIndex
+     */
+    public void setPayload(int payLoad, byte[]block, int pieceStart, int pieceIndex,
+                           int reqLen, int reqStart, int reqIndex){
+        switch (msgId){
+            case Have:
+                System.arraycopy(convertToByte(payLoad),0,this.message,5,4);
+                break;
+            case Piece:
+                this.block = block;
+                System.arraycopy(convertToByte(pieceIndex),0,this.message,5,4);
+                System.arraycopy(convertToByte(pieceStart),0,this.message,9,4);
+                System.arraycopy(block,0,this.message,13,this.lengthPrefix - 9);
+                break;
+            case Request:
+                System.arraycopy(convertToByte(reqIndex),0,this.message,5,4);
+                System.arraycopy(convertToByte(reqStart),0,this.message,9,4);
+                System.arraycopy(convertToByte(reqLen),0,this.message,13,4);
+                break;
+            default:
+                // do nothing
+        }
 
+        }
+
+    /**
+     * gets payLoad of the message
+     * @return byte[]
+     */
+    public byte[] getPayLoad(){
+        byte[] ans = null;
+
+        switch (msgId){
+            case Have:
+                ans = new byte[4];
+                System.arraycopy(this.message,5,ans,0,4);
+                break;
+            case Piece:
+                ans = new byte[this.lengthPrefix -1];
+                System.arraycopy(this.message,5,ans,0,this.lengthPrefix - 1);
+                break;
+            case Request:
+                ans =  new byte[12];
+                System.arraycopy(this.message,5,ans,0,12);
+                break;
+            default:
+                System.out.println("No payload required for this messsage");
+        }
+
+        return ans;
     }
 
 
