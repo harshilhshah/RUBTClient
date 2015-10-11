@@ -1,44 +1,57 @@
 package bittorrent;
 
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * Created by krupal on 10/10/2015.
  */
 public class PeerMsg {
-    /*public static void main (String args[]){
-        byte[] msg = new byte[13+4];
-        for(int i = 0; i< msg.length;i++) {
-            System.out.print(msg[i]);
-        }
-    }*/
-
-    public static final byte Choke = 0;
-    public static final byte Un_Choke = 1;
-    public static final byte Interested = 2;
-    public static final byte Not_Interested = 3;
-    public static final byte Have = 4;
-    public static final byte BitField = 5;
-    public static final byte Request = 6;
-    public static final byte Piece = 7;
-    public static final byte Cancel = 8;
+	
+	public enum MessageType{
+		
+		Choke(0),
+		Un_Choke(1), 
+		Interested(2), 
+		Not_Interested(3), 
+		Have(4), 
+		BitField(5), 
+		Request(6), 
+		Piece(7), 
+		Cancel(8);
+		
+		private final byte id;
+		private byte lengthPrefix;
+		
+		MessageType(int id){
+			this.id = (byte) id;
+			if(id == 0 || id == 1 || id == 2 || id == 3)
+				this.lengthPrefix = 1;
+			else if(id == 4)
+				this.lengthPrefix = 5;
+			else if(id == 6)
+				this.lengthPrefix = 13;
+			else
+				this.lengthPrefix = 0;
+		}
+	}
 
 
     private byte[] message;
-    public final byte msgId;
-    public final int lengthPrefix;
-    byte[] block;
+    private final MessageType mtype;
+    private byte[] block;
+    
+    
     /**
      * Constructor for peer to send messages
-     * @param lenPre
-     * @param msgID
+     * @param MessageType
      */
-    public PeerMsg(int lenPre, byte msgID){
-        this.lengthPrefix = lenPre;
-        this.msgId = msgID;
-        this.message = new byte[this.lengthPrefix + 4];
-        setMessage();
-
+    
+    public PeerMsg(MessageType type){
+    	this.mtype = type;
+    	this.message = new byte[mtype.lengthPrefix + 4];
+    	setMessage();
     }
 
     /**
@@ -53,37 +66,8 @@ public class PeerMsg {
      * sets up the byte array for messages
      */
     public void setMessage(){
-        switch (msgId){
-            case Choke:
-                System.arraycopy(convertToByte(1),0,this.message,0,4);
-                this.message[4] = (byte)0;
-                break;
-            case Un_Choke:
-                System.arraycopy(convertToByte(1),0,this.message,0,4);
-                this.message[4] = (byte)1;
-                break;
-            case Interested:
-                System.arraycopy(convertToByte(1),0,this.message,0,4);
-                this.message[4] = (byte)2;
-                break;
-            case Not_Interested:
-                System.arraycopy(convertToByte(1),0,this.message,0,4);
-                this.message[4] = (byte)3;
-                break;
-            case Have:
-                System.arraycopy(convertToByte(5),0,this.message,0,4);
-                this.message[4] = (byte)4;
-                break;
-            case Request:
-                System.arraycopy(convertToByte(13),0,this.message,0,4);
-                this.message[4] = (byte)6;
-                break;
-            case Piece:
-                System.arraycopy(convertToByte(this.lengthPrefix),0,this.message,0,4);
-                this.message[4] = (byte)7;
-                break;
-
-        }
+    	System.arraycopy(convertToByte(mtype.lengthPrefix),0,this.message,0,4);
+        this.message[4] = mtype.id;
     }
 
     /**
@@ -94,7 +78,6 @@ public class PeerMsg {
     public static byte[] convertToByte(int value){
         ByteBuffer bb = ByteBuffer.allocate(4);
         bb.putInt(value);
-
         return bb.array();
     }
 
@@ -110,7 +93,7 @@ public class PeerMsg {
      */
     public void setPayload(int payLoad, byte[]block, int pieceStart, int pieceIndex,
                            int reqLen, int reqStart, int reqIndex){
-        switch (msgId){
+        switch (mtype){
             case Have:
                 System.arraycopy(convertToByte(payLoad),0,this.message,5,4);
                 break;
@@ -118,7 +101,7 @@ public class PeerMsg {
                 this.block = block;
                 System.arraycopy(convertToByte(pieceIndex),0,this.message,5,4);
                 System.arraycopy(convertToByte(pieceStart),0,this.message,9,4);
-                System.arraycopy(block,0,this.message,13,this.lengthPrefix - 9);
+                System.arraycopy(block,0,this.message,13,mtype.lengthPrefix - 9);
                 break;
             case Request:
                 System.arraycopy(convertToByte(reqIndex),0,this.message,5,4);
@@ -129,27 +112,22 @@ public class PeerMsg {
                 // do nothing
         }
 
-        }
+    }
 
     /**
      * gets payLoad of the message
      * @return byte[]
      */
     public byte[] getPayLoad(){
+    	
         byte[] ans = null;
 
-        switch (msgId){
+        switch (mtype){
             case Have:
-                ans = new byte[4];
-                System.arraycopy(this.message,5,ans,0,4);
-                break;
             case Piece:
-                ans = new byte[this.lengthPrefix -1];
-                System.arraycopy(this.message,5,ans,0,this.lengthPrefix - 1);
-                break;
             case Request:
-                ans =  new byte[12];
-                System.arraycopy(this.message,5,ans,0,12);
+                ans = new byte[mtype.lengthPrefix -1];
+                System.arraycopy(this.message,5,ans,0,mtype.lengthPrefix - 1);
                 break;
             default:
                 System.out.println("No payload required for this messsage");
@@ -157,11 +135,10 @@ public class PeerMsg {
 
         return ans;
     }
-
-
-
-
-
-
+    
+    @Override
+    public String toString(){
+		return Arrays.toString(this.getMessage());
+    }
 
 }

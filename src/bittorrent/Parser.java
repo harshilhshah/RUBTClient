@@ -1,9 +1,16 @@
 package bittorrent;
 
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 
 public class Parser {
@@ -45,20 +52,19 @@ public class Parser {
 	private int downloaded = 0;
 	private int uploaded = 0;
 	private int left;
-	private byte[] info_hash_bytes;
 	private String info_hash;
 	private String ip_addr;
-	private final int port = 6881;
-	
+	private final int port = 6885;
+	private final TorrentInfo ti;
 	
 	private int interval = 0;
 	private int min_interval = 0;
 	
-	public Parser(TorrentInfo ti){
+	public Parser(TorrentInfo tInfo){
+		this.ti = tInfo;
 		this.ip_addr = ti.announce_url.toString();
-		this.info_hash_bytes = ti.info_hash.array();
-		this.info_hash = Converter.bytesToURL(info_hash_bytes);
-		left = ti.file_length;
+		this.info_hash = Converter.bytesToURL(ti.info_hash.array());
+		this.left = ti.file_length;
 	}
 	
 	public String getUrl(){
@@ -67,7 +73,31 @@ public class Parser {
 				+ downloaded + "&left=" + left;
 	}
 	
-	public List<Peer> parseResponse(byte[] resp) throws BencodingException, UnsupportedEncodingException{
+	public byte[] makeGetRequest() throws MalformedURLException, IOException {
+		URL url = new URL(getUrl());
+		HttpURLConnection http_conn = (HttpURLConnection) url.openConnection();
+		http_conn.setRequestMethod("GET");
+		
+		InputStream is = null;
+		DataInputStream baos = null;
+		byte[] byteArray;
+		
+		try{
+			is = http_conn.getInputStream();
+			baos = new DataInputStream(is);
+		
+			byteArray = new byte[http_conn.getContentLength()];
+			baos.readFully(byteArray);
+		} finally{
+			if(is != null)
+				is.close();
+			if(baos != null)
+				baos.close();
+		}
+		return byteArray;
+	}
+	
+	public List<Peer> parseResponse(byte[] resp) throws BencodingException, UnknownHostException, IOException{
 		
 		List<Peer> peers_list = new ArrayList<Peer>();
 		
@@ -108,11 +138,10 @@ public class Parser {
 			byte[] peer_id = ((ByteBuffer) pair.get(KEY_PEER_ID)).array();
 			
 			if(Converter.objectToStr(pair.get(KEY_PEER_ID)).contains("RU"))
-				peers_list.add(new Peer(Parser.my_peer_id.getBytes(),port,ip,peer_id,info_hash_bytes));
+				peers_list.add(new Peer(Parser.my_peer_id.getBytes(),port,ip,peer_id,this.ti));
 		}
 		
 		//ToolKit.print(Bencoder2.decode(resp));
-		//System.out.println(Converter.objectToStr(Bencoder2.decode(resp)));
 		
 		return peers_list;
 		
