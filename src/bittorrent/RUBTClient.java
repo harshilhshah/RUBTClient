@@ -95,15 +95,13 @@ public class RUBTClient {
 		
 		
 		/* Decoding the tracker response in order to get list of peers */
-		List<Peer> peers = null;
 		try {
-			peers = parser.parseResponse(byteArray);
+			if(parser.parseResponse(byteArray) == null)
+				printError(NO_PEERS_FOUND);
 		} catch (BencodingException | UnsupportedEncodingException e) {
 			e.printStackTrace();
 		}
 		
-		if(peers == null)
-			printError(NO_PEERS_FOUND);
 		
 		
 	}

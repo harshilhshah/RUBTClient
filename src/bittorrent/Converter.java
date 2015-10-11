@@ -43,6 +43,7 @@ public class Converter {
 		return hexString;
 	}
 	
+	
 	protected static String objectToStr(Object o){
 		
 		if(o instanceof Integer){

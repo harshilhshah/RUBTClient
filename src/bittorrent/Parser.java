@@ -41,10 +41,11 @@ public class Parser {
 	});
 	
 	// change this later because it's hard-coded
-	private final String peer_id = Converter.bytesToURL("ihatethisproject".getBytes());
+	public static final String my_peer_id = Converter.bytesToURL("ihatethisprojectbruh".getBytes());
 	private int downloaded = 0;
 	private int uploaded = 0;
 	private int left;
+	private byte[] info_hash_bytes;
 	private String info_hash;
 	private String ip_addr;
 	private final int port = 6881;
@@ -54,13 +55,14 @@ public class Parser {
 	private int min_interval = 0;
 	
 	public Parser(TorrentInfo ti){
-		ip_addr = ti.announce_url.toString();
-		info_hash = Converter.bytesToURL(ti.info_hash.array());
+		this.ip_addr = ti.announce_url.toString();
+		this.info_hash_bytes = ti.info_hash.array();
+		this.info_hash = Converter.bytesToURL(info_hash_bytes);
 		left = ti.file_length;
 	}
 	
 	public String getUrl(){
-		return ip_addr + "?info_hash=" + info_hash + "&peer_id=" + peer_id 
+		return ip_addr + "?info_hash=" + info_hash + "&peer_id=" + my_peer_id 
 				+ "&port=" + port + "&uploaded=" + uploaded + "&downloaded="
 				+ downloaded + "&left=" + left;
 	}
@@ -105,10 +107,11 @@ public class Parser {
 			String ip = Converter.objectToStr(pair.get(KEY_IP));
 			byte[] peer_id = ((ByteBuffer) pair.get(KEY_PEER_ID)).array();
 			
-			peers_list.add(new Peer(port,ip,peer_id));
+			if(Converter.objectToStr(pair.get(KEY_PEER_ID)).contains("RU"))
+				peers_list.add(new Peer(Parser.my_peer_id.getBytes(),port,ip,peer_id,info_hash_bytes));
 		}
 		
-		ToolKit.print(Bencoder2.decode(resp));
+		//ToolKit.print(Bencoder2.decode(resp));
 		//System.out.println(Converter.objectToStr(Bencoder2.decode(resp)));
 		
 		return peers_list;
