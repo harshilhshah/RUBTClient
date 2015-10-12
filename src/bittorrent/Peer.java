@@ -157,9 +157,6 @@ public class Peer {
 		this.out.flush();
 		this.in.read(recieve_message);
 		
-		System.out.println("Send:" + new String(send_message, "UTF-8"));
-		System.out.println("Recv:" + new String(recieve_message, "UTF-8"));
-		
 		return recieve_message;
 		
 	}
