@@ -4,8 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
- * This file is simply used to make messages the takes place between peers.
- * Created by krupal on 10/10/2015.
+ *  @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
  */
 public class PeerMsg {
 	

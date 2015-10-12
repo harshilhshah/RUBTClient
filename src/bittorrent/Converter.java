@@ -1,7 +1,7 @@
 package bittorrent;
 
 /**
- * @author Krupal Suthar, Harshil Shah, Aishwarya Gondhi
+ *  @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
  */
 
 import java.io.UnsupportedEncodingException;

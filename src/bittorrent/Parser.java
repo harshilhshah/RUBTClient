@@ -1,7 +1,7 @@
 package bittorrent;
 
 /**
- * @author  Harshil Shah
+ *  @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
  */
 
 import java.net.HttpURLConnection;
