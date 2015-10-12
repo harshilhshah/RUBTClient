@@ -59,7 +59,7 @@ public class Parser {
 	private String info_hash;
 	private String ip_addr;
 	private final int port;
-	private final TorrentInfo ti;
+	protected final TorrentInfo ti;
 	
 	public static int interval = 0;
 	
@@ -167,7 +167,7 @@ public class Parser {
 			byte[] peer_id = ((ByteBuffer) pair.get(KEY_PEER_ID)).array();
 			
 			if(Converter.objectToStr(pair.get(KEY_PEER_ID)).contains("RU"))
-				peers_list.add(new Peer(this.my_peer_id.getBytes(),port,ip,peer_id,this.ti));
+				peers_list.add(new Peer(this.my_peer_id.getBytes(),port,ip,peer_id,this));
 		}
 		
 		return peers_list;
@@ -189,6 +189,10 @@ public class Parser {
 		return sb.toString();
 	}
 	
+	public void setDownloaded(int num){
+		this.downloaded = num;
+		this.left = this.ti.file_length - num;
+	}
 	
 	
 

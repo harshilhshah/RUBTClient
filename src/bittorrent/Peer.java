@@ -27,15 +27,17 @@ public class Peer {
 	private DataOutputStream out;
 	private byte[] my_id;
 	private TorrentInfo ti;
+	private Parser p;
 	private Socket socket = null;
 	
 	
-	public Peer(byte[] my_id, int port, String ip_address, byte[] client_id, TorrentInfo ti) throws UnknownHostException, IOException{
+	public Peer(byte[] my_id, int port, String ip_address, byte[] client_id, Parser p) throws UnknownHostException, IOException{
 		this.my_id = my_id;
 		this.port = port;
 		this.ip = ip_address;
 		this.peer_id = client_id;
-		this.ti = ti;
+		this.ti = p.ti;
+		this.p = p;
 		this.info_hash = ti.info_hash.array();
 		
 		
@@ -122,7 +124,8 @@ public class Peer {
 				writeMessage(m);
 				readMessage(13); // don't care about <length-prefix><7> and <index><begin>
 				System.arraycopy(readMessage(rLen), 0, thefile, bytesWritten, rLen);
-				
+				this.p.setDownloaded(bytesWritten);
+				this.p.makeGetRequest();
 				bytesWritten += rLen;
 				
 			}
