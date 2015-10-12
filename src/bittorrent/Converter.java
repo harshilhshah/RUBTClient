@@ -1,5 +1,9 @@
 package bittorrent;
 
+/**
+ * @author Krupal Suthar, Harshil Shah, Aishwarya Gondhi
+ */
+
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -7,42 +11,41 @@ import java.util.Map;
 
 public class Converter {
 	
-	/* copied. Gotta change this */
+	private final static char[] HEX_CHARS = "0123456789ABCDEF".toCharArray();
 	
-	private final static char[] HEX_CHARS = { '0', '1', '2', '3', '4', '5',
-		'6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
-	
-	
-	public static String bytesToURL(final byte[] byteArr) {
+	/**
+	 * This method formats the given byte array into a string for the url
+	 * @param byteArr
+	 * @return String
+	 */
+	public static String bytesToURL(byte[] byteArr) {
 
-		final String hexString = bytesToHexStr(byteArr);
+		char[] charArr = new char[byteArr.length * 2];
+		for (int i = 0; i < byteArr.length; i++) {
+			int v = byteArr[i] & 0xFF;
+			charArr[i * 2] = HEX_CHARS[v >>> 4];
+			charArr[i * 2 + 1] = HEX_CHARS[v & 0x0F];
+		}
+		
+		String hexStr =  new String(charArr);
 
-		final int len = hexString.length();
-		final char[] charArr = new char[len + (len / 2)];
+		int len = hexStr.length();
+		charArr = new char[len + (len / 2)];
 		int i = 0;
 		int j = 0;
 		while (i < len) {
 			charArr[j++] = '%';
-			charArr[j++] = hexString.charAt(i++);
-			charArr[j++] = hexString.charAt(i++);
+			charArr[j++] = hexStr.charAt(i++);
+			charArr[j++] = hexStr.charAt(i++);
 		}
 		return new String(charArr);
 	}
 	
-	protected static String bytesToHexStr(final byte[] byteArr) {
-
-		final char[] charArr = new char[byteArr.length * 2];
-		for (int i = 0; i < byteArr.length; i++) {
-			final int val = (byteArr[i] & 0xFF);
-			final int charLoc = i << 1;
-			charArr[charLoc] = HEX_CHARS[val >>> 4];
-			charArr[charLoc + 1] = HEX_CHARS[val & 0x0F];
-		}
-		final String hexString = new String(charArr);
-
-		return hexString;
-	}
-	
+	/*
+	 * This method helps convert almost any object into a string
+	 * @param Object
+	 * @return String
+	 */
 	
 	protected static String objectToStr(Object o){
 		

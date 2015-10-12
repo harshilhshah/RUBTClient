@@ -1,5 +1,9 @@
 package bittorrent;
 
+/**
+ * @author  Harshil Shah
+ */
+
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -8,10 +12,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 
 public class Parser {
 	
@@ -47,56 +51,88 @@ public class Parser {
 			'p', 'e', 'e', 'r', ' ', 'i', 'd' 
 	});
 	
-	// change this later because it's hard-coded
-	public static final String my_peer_id = Converter.bytesToURL("ihatethisprojectbruh".getBytes());
+	
+	public final String my_peer_id = generateMyId(20);
 	private int downloaded = 0;
 	private int uploaded = 0;
 	private int left;
 	private String info_hash;
 	private String ip_addr;
-	private final int port = 6885;
+	private final int port;
 	private final TorrentInfo ti;
 	
-	private int interval = 0;
-	private int min_interval = 0;
+	public static int interval = 0;
 	
 	public Parser(TorrentInfo tInfo){
 		this.ti = tInfo;
 		this.ip_addr = ti.announce_url.toString();
 		this.info_hash = Converter.bytesToURL(ti.info_hash.array());
 		this.left = ti.file_length;
+		this.port = getPort(ti.announce_url.toString());
 	}
 	
-	public String getUrl(){
-		return ip_addr + "?info_hash=" + info_hash + "&peer_id=" + my_peer_id 
+	
+	/*
+	 * This method parses the port from the announce url and returns the port number
+	 * @param String: url
+	 * @return int
+	 */
+	private int getPort(String url) {
+		return Integer.parseInt(url.substring(url.indexOf((int)':', 6)+1, url.lastIndexOf((int)'/')));
+	}
+
+	
+	/*
+	 * This method creates a formatted url
+	 * @return String
+	 */
+	public URL getUrl() throws MalformedURLException{
+		return new URL(ip_addr + "?info_hash=" + info_hash + "&peer_id=" + my_peer_id 
 				+ "&port=" + port + "&uploaded=" + uploaded + "&downloaded="
-				+ downloaded + "&left=" + left;
+				+ downloaded + "&left=" + left);
 	}
 	
+	
+	/*
+	 * This method makes a connection to the host.
+	 * @return byte[] 
+	 */
 	public byte[] makeGetRequest() throws MalformedURLException, IOException {
-		URL url = new URL(getUrl());
-		HttpURLConnection http_conn = (HttpURLConnection) url.openConnection();
+		
+		HttpURLConnection http_conn = (HttpURLConnection) getUrl().openConnection();
 		http_conn.setRequestMethod("GET");
 		
 		InputStream is = null;
 		DataInputStream baos = null;
-		byte[] byteArray;
+		byte[] byteArray = null;
 		
 		try{
 			is = http_conn.getInputStream();
 			baos = new DataInputStream(is);
-		
+			
 			byteArray = new byte[http_conn.getContentLength()];
 			baos.readFully(byteArray);
-		} finally{
+			is.close();
+			baos.close();
+			http_conn.disconnect();
+		} catch(IOException ioe){
 			if(is != null)
 				is.close();
 			if(baos != null)
 				baos.close();
-		}
+			System.out.println(ioe.getMessage());
+			throw ioe;
+		} 
 		return byteArray;
 	}
 	
+	
+	
+	/*
+	 * This method parses the list of peers from tracker response
+	 * @param byte[]: tracker response
+	 * @return List<Peer>
+	 */
 	public List<Peer> parseResponse(byte[] resp) throws BencodingException, UnknownHostException, IOException{
 		
 		List<Peer> peers_list = new ArrayList<Peer>();
@@ -104,24 +140,17 @@ public class Parser {
 		@SuppressWarnings("unchecked")
 		Map<ByteBuffer, Object> tracker = (Map<ByteBuffer, Object>) Bencoder2.decode(resp);
 		
-		if(tracker.containsKey(KEY_FAILURE_REASON)){
+		if(tracker.containsKey(KEY_FAILURE_REASON))
 			throw new BencodingException(tracker.get(KEY_FAILURE_REASON).toString());
-		}
-		
-		if(tracker.containsKey(KEY_INTERVAL)){
-			this.interval = ((Integer)tracker.get(KEY_INTERVAL)).intValue();
-		}else{
-			System.out.println("Warning: No interval found in the response.");
-		}
-		
-		if(tracker.containsKey(KEY_MIN_INTERVAL)){
-			this.min_interval = ((Integer)tracker.get(KEY_INTERVAL)).intValue();
-		}else{
-			System.out.println("Warning: No min interval found in the response.");
-		}
 		
 		if(!tracker.containsKey(KEY_PEERS))
 			return null;
+		
+		if(tracker.containsKey(KEY_INTERVAL)){
+			Parser.interval = ((Integer)tracker.get(KEY_INTERVAL)).intValue();
+		}else{
+			System.out.println("Warning: No interval found in the response.");
+		}
 		
 		for( Object elem: (ArrayList<?>)tracker.get(KEY_PEERS) ) {
 			
@@ -138,13 +167,26 @@ public class Parser {
 			byte[] peer_id = ((ByteBuffer) pair.get(KEY_PEER_ID)).array();
 			
 			if(Converter.objectToStr(pair.get(KEY_PEER_ID)).contains("RU"))
-				peers_list.add(new Peer(Parser.my_peer_id.getBytes(),port,ip,peer_id,this.ti));
+				peers_list.add(new Peer(this.my_peer_id.getBytes(),port,ip,peer_id,this.ti));
 		}
-		
-		//ToolKit.print(Bencoder2.decode(resp));
 		
 		return peers_list;
 		
+	}
+	
+	
+	/*
+	 * This method generates a random string
+	 * @param int: length of the string to be generated
+	 * @return String
+	 */
+	private String generateMyId(int len){
+		final String alphaStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+		Random rnd = new Random();
+		StringBuilder sb = new StringBuilder( len );
+		for( int i = 0; i < len; i++ ) 
+			sb.append(alphaStr.charAt(rnd.nextInt(alphaStr.length())));
+		return sb.toString();
 	}
 	
 	

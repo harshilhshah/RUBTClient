@@ -1,14 +1,18 @@
 package bittorrent;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
+ * This file is simply used to make messages the takes place between peers.
  * Created by krupal on 10/10/2015.
  */
 public class PeerMsg {
 	
+	
+	/*
+	 * Made an enum to make life easier. 
+	 */
 	public enum MessageType{
 		
 		Choke(0),
@@ -40,7 +44,6 @@ public class PeerMsg {
 
     private byte[] message;
     private final MessageType mtype;
-    private byte[] block;
     
     
     /**
@@ -51,7 +54,8 @@ public class PeerMsg {
     public PeerMsg(MessageType type){
     	this.mtype = type;
     	this.message = new byte[mtype.lengthPrefix + 4];
-    	setMessage();
+    	System.arraycopy(convertToByte(mtype.lengthPrefix),0,this.message,0,4);
+        this.message[4] = mtype.id;
     }
 
     /**
@@ -63,17 +67,9 @@ public class PeerMsg {
     }
 
     /**
-     * sets up the byte array for messages
-     */
-    public void setMessage(){
-    	System.arraycopy(convertToByte(mtype.lengthPrefix),0,this.message,0,4);
-        this.message[4] = mtype.id;
-    }
-
-    /**
      * Converts int to 4 byte big-endian
      * @param value
-     * @return
+     * @return byte[]
      */
     public static byte[] convertToByte(int value){
         ByteBuffer bb = ByteBuffer.allocate(4);
@@ -83,35 +79,16 @@ public class PeerMsg {
 
     /**
      * Set payload of this message.
-     * @param payLoad
-     * @param block
-     * @param pieceStart
-     * @param pieceIndex
      * @param reqLen
      * @param reqStart
      * @param reqIndex
      */
-    public void setPayload(int payLoad, byte[]block, int pieceStart, int pieceIndex,
-                           int reqLen, int reqStart, int reqIndex){
-        switch (mtype){
-            case Have:
-                System.arraycopy(convertToByte(payLoad),0,this.message,5,4);
-                break;
-            case Piece:
-                this.block = block;
-                System.arraycopy(convertToByte(pieceIndex),0,this.message,5,4);
-                System.arraycopy(convertToByte(pieceStart),0,this.message,9,4);
-                System.arraycopy(block,0,this.message,13,mtype.lengthPrefix - 9);
-                break;
-            case Request:
-                System.arraycopy(convertToByte(reqIndex),0,this.message,5,4);
-                System.arraycopy(convertToByte(reqStart),0,this.message,9,4);
-                System.arraycopy(convertToByte(reqLen),0,this.message,13,4);
-                break;
-            default:
-                // do nothing
+    public void setPayload(int reqLen, int reqStart, int reqIndex){
+        if(this.mtype == MessageType.Request){
+        	System.arraycopy(convertToByte(reqIndex),0,this.message,5,4);
+            System.arraycopy(convertToByte(reqStart),0,this.message,9,4);
+            System.arraycopy(convertToByte(reqLen),0,this.message,13,4);
         }
-
     }
 
     /**

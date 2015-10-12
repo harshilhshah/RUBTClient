@@ -1,5 +1,12 @@
 package bittorrent;
 
+/**
+ * The RUBTClient program implements a bit torrent client that
+ * downloads the file from peer and puts it in your directory.
+ *
+ * @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
+ */
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -21,8 +28,8 @@ public class RUBTClient {
 			+ "execute HTTP GET request";
 	static final String NO_PEERS_FOUND = "Warning: No peers found in the response. Terminating ..";
 	
-	static String output_file;
-	static byte[] byteArray = null;
+	private static String output_file; 
+	private static byte[] byteArray = null;
 
 	public static void main(String[] args) {			
 		
@@ -34,8 +41,8 @@ public class RUBTClient {
 		if(args[0] == null)
 			printError(NULL_FILENAME);
 		
+		
 		output_file = args[1];
-	
 		
 		
 		/* Opening and reading the data inside the file */
@@ -76,17 +83,31 @@ public class RUBTClient {
 			printError(String.format(INVALID_URL,args[0]));
 		} catch (IOException e) {
 			printError(GET_FAILED);
-		} catch (BencodingException e) {
-			e.printStackTrace();
+		} catch (BencodingException be) {
+			printError(be.getMessage());
 		}
 		
 	}
 	
+	
+	
+
+	/**
+	 * prints the given error message and exits.
+	 * @param error_message
+	 */
 	private static void printError(String error_message){
 		System.out.println(error_message);
 		System.exit(1);
 	}
+	
+	
+	
 		
+	/**
+	 * Makes a file specified by User and writes the bytes downloaded from peer.
+	 * @param bytes
+	 */
 	public static void writeToFile(byte[] bytes){
 		
 		File file = new File(RUBTClient.output_file);
