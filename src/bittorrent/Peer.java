@@ -100,7 +100,7 @@ public class Peer {
 			
 			writeMessage(new PeerMsg(MessageType.Interested));
 			
-			while(readMessage(5)[5] != 1){ // loop until peer unchokes
+			while(readMessage(5)[4] != 1){ // loop until peer unchokes
 				writeMessage(new PeerMsg(MessageType.Interested));
 			}
 			
