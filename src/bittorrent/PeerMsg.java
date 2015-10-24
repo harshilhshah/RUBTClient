@@ -1,47 +1,15 @@
 package bittorrent;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
+import utility.Constants;
+import utility.Converter;
 
 /**
  *  @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
  */
-public class PeerMsg {
-	
-	
-	/*
-	 * Made an enum to make life easier. 
-	 */
-	public enum MessageType{
-		
-		Choke(0),
-		Un_Choke(1), 
-		Interested(2), 
-		Not_Interested(3), 
-		Have(4), 
-		BitField(5), 
-		Request(6), 
-		Piece(7), 
-		Cancel(8);
-		
-		private final byte id;
-		private byte lengthPrefix;
-		
-		MessageType(int id){
-			this.id = (byte) id;
-			if(id == 0 || id == 1 || id == 2 || id == 3)
-				this.lengthPrefix = 1;
-			else if(id == 4)
-				this.lengthPrefix = 5;
-			else if(id == 6)
-				this.lengthPrefix = 13;
-			else
-				this.lengthPrefix = 0;
-		}
-	}
+public class PeerMsg implements Constants{
 
 
-    private byte[] message;
+    private byte[] msg;
     private final MessageType mtype;
     
     
@@ -52,9 +20,9 @@ public class PeerMsg {
     
     public PeerMsg(MessageType type){
     	this.mtype = type;
-    	this.message = new byte[mtype.lengthPrefix + 4];
-    	System.arraycopy(convertToByte(mtype.lengthPrefix),0,this.message,0,4);
-        this.message[4] = mtype.id;
+    	this.msg = new byte[mtype.lenPref + 4];
+    	System.arraycopy(Converter.intToByteArr(mtype.lenPref),0,this.msg,0,4);
+        this.msg[4] = mtype.id;
     }
 
     /**
@@ -62,18 +30,7 @@ public class PeerMsg {
      * @return byte[]
      */
     public byte[] getMessage(){
-        return this.message;
-    }
-
-    /**
-     * Converts int to 4 byte big-endian
-     * @param value
-     * @return byte[]
-     */
-    public static byte[] convertToByte(int value){
-        ByteBuffer bb = ByteBuffer.allocate(4);
-        bb.putInt(value);
-        return bb.array();
+        return this.msg;
     }
 
     /**
@@ -84,9 +41,9 @@ public class PeerMsg {
      */
     public void setPayload(int reqLen, int reqStart, int reqIndex){
         if(this.mtype == MessageType.Request){
-        	System.arraycopy(convertToByte(reqIndex),0,this.message,5,4);
-            System.arraycopy(convertToByte(reqStart),0,this.message,9,4);
-            System.arraycopy(convertToByte(reqLen),0,this.message,13,4);
+        	System.arraycopy(Converter.intToByteArr(reqIndex),0,this.msg,5,4);
+            System.arraycopy(Converter.intToByteArr(reqStart),0,this.msg,9,4);
+            System.arraycopy(Converter.intToByteArr(reqLen),0,this.msg,13,4);
         }
     }
 
@@ -102,8 +59,8 @@ public class PeerMsg {
             case Have:
             case Piece:
             case Request:
-                ans = new byte[mtype.lengthPrefix -1];
-                System.arraycopy(this.message,5,ans,0,mtype.lengthPrefix - 1);
+                ans = new byte[mtype.lenPref -1];
+                System.arraycopy(this.msg,5,ans,0,mtype.lenPref - 1);
                 break;
             default:
                 System.out.println("No payload required for this messsage");
@@ -114,7 +71,7 @@ public class PeerMsg {
     
     @Override
     public String toString(){
-		return Arrays.toString(this.getMessage());
+		return Converter.byteArrToStr(this.msg);
     }
 
 }

@@ -13,22 +13,17 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
+import java.util.Scanner;
+import java.util.Timer;
+import java.util.TimerTask;
 
-public class RUBTClient {
+import utility.Constants;
+
+public class RUBTClient implements Constants {
 	
-	static final String INVALID_ARGS = "Error: Invalid number of arguments\n"
-			+ "\nUsage: java cp . RUBTClient <load_file> <storage_file>";
-	static final String NULL_FILENAME = "Error: Please provide a valid file path";
-	static final String FILE_NOT_FOUND  = "Error: The file %s doesn't exist. "
-			+ "\nPlease provide a valid file path name";
-	static final String CORRUPT_FILE = "Error: the file %s is corrupted.";
-	static final String INVALID_URL = "Error: An invalid url was formed. "
-			+ "\nCheck the contents of the file %s";
-	static final String GET_FAILED = "Error: The program failed to properly "
-			+ "execute HTTP GET request";
-	static final String NO_PEERS_FOUND = "Warning: No peers found in the response. Terminating ..";
-	
-	private static String output_file; 
+	static TrackerInfo tInfo;
+	static Timer announceTimer = new Timer();
+	static String output_file; 
 	private static byte[] byteArray = null;
 
 	public static void main(String[] args) {			
@@ -63,19 +58,18 @@ public class RUBTClient {
 		
 		/* Creating parser which will parse info from torrent_info */
 		
-		Parser parser = null;
+		
 		try {
-			parser = new Parser(new TorrentInfo(byteArray));
+			tInfo = new TrackerInfo(byteArray);
 		} catch (BencodingException e1) {
 			printError(e1.getMessage() + String.format(CORRUPT_FILE,args[0]));
 		}
 		
 		
-		
 		/* Making a get request and decoding the request */
 		
 		try {
-			if(parser.parseResponse(parser.makeGetRequest()) == null)
+			if(tInfo.getPeers(tInfo.announce(Event.Empty)) == null)
 				printError(NO_PEERS_FOUND);
 		} catch (UnknownHostException uhe){
 			printError(uhe.getMessage());
@@ -87,8 +81,51 @@ public class RUBTClient {
 			printError(be.getMessage());
 		}
 		
+		new Thread(new InputListener()).start();
+		announceTimer.schedule(new Announcer(), tInfo.getInterval() * 1000);
+		
 	}
 	
+	private static class InputListener implements Runnable{
+
+		@Override
+		public void run() {
+			Scanner sc = new Scanner(System.in);
+			
+			do{
+				System.out.println("Enter \"exit\" to quit downloading.");
+			}while(!sc.nextLine().equals("quit"));
+			
+			System.out.println("Quiting the program...");
+			
+			sc.close();
+			try {
+				RUBTClient.tInfo.announce(Event.Stopped);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			System.exit(0);
+		}
+		
+	}
+	
+	private static class Announcer extends TimerTask {
+
+		@Override
+		public void run() {
+			TrackerInfo ti = tInfo;
+			System.out.println(ti.getInterval());
+			try {
+				ti.updateIntervals(ti.announce(Event.Empty));
+			} catch (IOException | BencodingException e) {
+				e.printStackTrace();
+			} 
+			announceTimer.schedule(new Announcer(), ti.getMin_interval() * 1000);
+		}
+
+	}
+
 	
 	
 
@@ -115,8 +152,7 @@ public class RUBTClient {
 		RandomAccessFile stream = null;
 		try {
 			stream = new RandomAccessFile(file,"rw");
-			stream.write(bytes, 0, bytes.length);
-		
+			stream.write(bytes, 0, bytes.length);		
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {

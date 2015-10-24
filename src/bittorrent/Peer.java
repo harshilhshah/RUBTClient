@@ -8,16 +8,11 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 
-import bittorrent.PeerMsg.MessageType;
+import utility.Constants;
 
-public class Peer {
-	
-	static final byte[] BT_PROTOCOL = { 'B', 'i', 't', 'T', 'o',
-		'r', 'r', 'e', 'n', 't', ' ', 'p', 'r', 'o', 't', 'o', 'c', 'o', 'l' 
-	};
+public class Peer implements Constants, Runnable {
 	
 	private int port;
 	private String ip;
@@ -25,40 +20,19 @@ public class Peer {
 	private byte[] peer_id;
 	private DataInputStream in;
 	private DataOutputStream out;
-	private byte[] my_id;
-	private TorrentInfo ti;
-	private Parser p;
+	private TrackerInfo p;
 	private Socket socket = null;
 	
-	
-	public Peer(byte[] my_id, int port, String ip_address, byte[] client_id, Parser p) throws UnknownHostException, IOException{
-		this.my_id = my_id;
+	public Peer(int port, String ip_address, byte[] id, TrackerInfo p) {
 		this.port = port;
 		this.ip = ip_address;
-		this.peer_id = client_id;
-		this.ti = p.ti;
+		this.peer_id = id;
 		this.p = p;
-		this.info_hash = ti.info_hash.array();
-		
-		
-		// create a connection
-		this.socket = new Socket(this.ip, this.port);
-		this.socket.setSoTimeout(Parser.interval*1000);
-		this.in = new DataInputStream(this.socket.getInputStream());
-		this.out = new DataOutputStream(this.socket.getOutputStream());
-		
-		// validate the info hash and then start messaging 
-		if(isValid(handshake())) 
-			RUBTClient.writeToFile(startMessaging());
-		
-		// close everything
-		this.in.close();
-		this.out.close();
-		this.socket.close();
+		this.info_hash = p.info_hash.array();
 	}
 	
 	
-	/*
+	/**
 	 * This method validates the handshake response
 	 * @param byte[]
 	 * @return boolean
@@ -67,7 +41,6 @@ public class Peer {
 		
 		if(handshake == null || handshake.length != 68 || handshake[0] != 19)
 			return false;
-		
 		
 		byte[] spliced_arr = new byte[19];
 		System.arraycopy(handshake, 1, spliced_arr, 0, 19);
@@ -86,13 +59,13 @@ public class Peer {
 	}
 
 	
-	/*
+	/**
 	 * This method communicates with the peer
 	 * @return byte[]
 	 */
 	private byte[] startMessaging() {
 		// Optional: send bitfield message, but I didn't
-		byte[] thefile = new byte[ti.file_length];
+		byte[] thefile = new byte[p.file_length];
 		
 		try {
 			
@@ -107,15 +80,15 @@ public class Peer {
 			}
 			
 			int rLen = 16384;
-			int limit = ti.piece_hashes.length * (ti.piece_length/rLen);
+			int limit = p.piece_hashes.length * (p.piece_length/rLen);
 			int bytesWritten = 0;
 			
 			for(int counter = 0; counter < limit; counter++){
 				
 				if(counter == limit-1)
-					rLen = ti.file_length 
-					- (ti.piece_length * (ti.piece_hashes.length - 1)) 
-					- ( (ti.piece_length / rLen) - 1 ) * 16384;
+					rLen = p.file_length 
+					- (p.piece_length * (p.piece_hashes.length - 1)) 
+					- ( (p.piece_length / rLen) - 1 ) * 16384;
 				
 				int start = (counter%2) * rLen;
 				
@@ -125,7 +98,7 @@ public class Peer {
 				readMessage(13); // don't care about <length-prefix><7> and <index><begin>
 				System.arraycopy(readMessage(rLen), 0, thefile, bytesWritten, rLen);
 				this.p.setDownloaded(bytesWritten);
-				this.p.makeGetRequest();
+				this.p.announce(Event.Empty);
 				bytesWritten += rLen;
 				
 			}
@@ -139,7 +112,7 @@ public class Peer {
 	}
 
 	
-	/*
+	/**
 	 * This method makes a handshake with the peer
 	 * @return byte[]
 	 */
@@ -151,7 +124,7 @@ public class Peer {
 		send_message[0] = 19;
 		System.arraycopy(BT_PROTOCOL, 0, send_message, 1, BT_PROTOCOL.length);
 		System.arraycopy(this.info_hash, 0, send_message, 28, 20);
-		System.arraycopy(my_id, 0, send_message, 48, 20);
+		System.arraycopy(TrackerInfo.my_peer_id, 0, send_message, 48, 20);
 		
 		this.out.write(send_message);
 		this.out.flush();
@@ -161,17 +134,16 @@ public class Peer {
 		
 	}
 	
-	/*
+	/**
 	 * This method sends the given message
 	 * @param PeerMsg
 	 */
 	private void writeMessage(PeerMsg pm) throws IOException{
 		this.out.write(pm.getMessage());
 		this.out.flush();
-		
 	}
 	
-	/*
+	/**
 	 * This method reads the peer response
 	 * @param int
 	 * @return byte[]
@@ -181,6 +153,41 @@ public class Peer {
 		for(int i=0; i < len; i++)
 			bArr[i] = this.in.readByte();
 		return bArr;
+	}
+
+
+	@Override
+	public void run() {
+		// create a connection
+		try {
+			this.socket = new Socket(this.ip, this.port);
+			this.socket.setSoTimeout(p.getInterval()*1000);
+			this.in = new DataInputStream(this.socket.getInputStream());
+			this.out = new DataOutputStream(this.socket.getOutputStream());
+			
+			// validate the info hash and then start messaging 
+			if(isValid(handshake())) 
+				RUBTClient.writeToFile(startMessaging());
+			
+		}catch (IOException e) {
+			e.printStackTrace();
+		}finally {
+			try {
+				this.in.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			try {
+				this.out.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			try {
+				this.socket.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 }
