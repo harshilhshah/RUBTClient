@@ -13,6 +13,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 
+import bittorrent.PeerMsg.RequestMessage;
 import utility.Constants;
 import utility.Converter;
 
@@ -104,9 +105,8 @@ public class Peer implements Constants, Runnable {
 			
 			writeMessage(new PeerMsg(MessageType.Interested));
 			
-			if(PeerMsg.decodeMessageType(in,this.numPieces) == MessageType.Un_Choke){
+			while(PeerMsg.decodeMessageType(in,this.numPieces).mtype != MessageType.Un_Choke)
 				writeMessage(new PeerMsg(MessageType.Interested));
-			}
 			
 			int rLen = 16384;
 			int limit = ti.piece_hashes.length * (ti.piece_length/rLen);
@@ -124,9 +124,7 @@ public class Peer implements Constants, Runnable {
 				
 				int start = (counter%2) * rLen;
 				
-				PeerMsg m = new PeerMsg(MessageType.Request);
-				m.setPayload(rLen, start, counter/2);
-				writeMessage(m);
+				writeMessage(new RequestMessage(rLen, start, counter/2));
 				System.out.println(PeerMsg.decodeMessageType(in,this.numPieces));
 				//readMessage(13); // don't care about <length-prefix><7> and <index><begin>
 				//System.arraycopy(readMessage(rLen), 0, thefile, bytesWritten, rLen);

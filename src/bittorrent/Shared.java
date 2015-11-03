@@ -1,5 +1,6 @@
 package bittorrent;
 
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -12,28 +13,37 @@ public class Shared {
 
     public Shared(int size){
         this.have = new boolean[size];
+        Arrays.fill(this.have, false);
         this.pieces = new ConcurrentHashMap<Integer,Piece>();
     }
 
     public void put(byte[] b, int o, int loc, int len){
-        this.pieces.put(new Integer(o),new Piece(b,o,loc,len));
+    	Integer integer = new Integer(loc);
+    	if(this.pieces.containsKey(integer)){
+    		this.pieces.get(integer).addData(b, o);
+    		this.have[loc] = true;
+    	}else{
+    		this.pieces.put(integer,new Piece(b,o,loc,len));
+    	}
     }
     public byte[] get(int index){
     	Piece p = this.pieces.get(index);
-    	return (p != null && p.complete) ? p.data : null;
+    	return (p != null && this.have[p.loc]) ? p.data : null;
     }
     
     private class Piece{
     	
     	private byte[] data;
     	private int loc;
-    	public boolean complete;
     	
     	public Piece(byte[] b, int o, int loc, int len){
-    		complete = (data != null);
     		this.data = new byte[len];
     		System.arraycopy(b, 0, data, o, b.length);
     		this.loc = loc;
+    	}
+    	
+    	public void addData(byte[] b, int offset){
+    		System.arraycopy(b, 0, data, offset, b.length);
     	}
     	
     }

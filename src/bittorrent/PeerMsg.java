@@ -10,10 +10,51 @@ import utility.Converter;
  *  @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
  */
 public class PeerMsg implements Constants{
+	
+    protected byte[] msg;
+    protected final MessageType mtype;
+	
+	public static class RequestMessage extends PeerMsg{
 
+		public RequestMessage(int reqLen, int reqStart, int reqIndex) {
+			super(MessageType.Request);
+			System.arraycopy(Converter.intToByteArr(reqIndex),0,this.msg,5,4);
+            System.arraycopy(Converter.intToByteArr(reqStart),0,this.msg,9,4);
+            System.arraycopy(Converter.intToByteArr(reqLen),0,this.msg,13,4);
+		}
+		
+	}
+	
+	public static class HaveMessage extends PeerMsg{
 
-    private byte[] msg;
-    private final MessageType mtype;
+		public HaveMessage(int pieceIndex) {
+			super(MessageType.Have);
+			System.arraycopy(Converter.intToByteArr(pieceIndex),0,this.msg,5,4);
+		}
+		
+	}
+	
+	public static class PieceMessage extends PeerMsg{
+
+		public PieceMessage(int pieceIndex, int begin, byte[] block, int lenPref) {
+			super(MessageType.Piece, lenPref);
+			System.arraycopy(Converter.intToByteArr(pieceIndex),0,this.msg,5,4);
+			System.arraycopy(Converter.intToByteArr(begin),0,this.msg,9,4);
+			System.arraycopy(block,0,this.msg,13,block.length);
+		}
+		
+	}
+	
+	public static class BitfieldMessage extends PeerMsg{
+
+		public BitfieldMessage(byte[] data) {
+			super(MessageType.BitField);
+			System.arraycopy(data,0,this.msg,5,data.length);
+		}
+		
+	}
+	
+	
     
     
     /**
@@ -31,9 +72,9 @@ public class PeerMsg implements Constants{
     /**
      * Constructor mainly for bitfield messages 
      */
-    public PeerMsg(MessageType type, int numPieces){
+    public PeerMsg(MessageType type, int lenPref){
     	this.mtype = type;
-    	this.mtype.lenPref += numPieces / 8;
+    	this.mtype.lenPref = (byte) lenPref;
     	this.msg = new byte[mtype.lenPref + 4];
     	System.arraycopy(Converter.intToByteArr(mtype.lenPref),0,this.msg,0,4);
         this.msg[4] = mtype.id;
@@ -47,67 +88,39 @@ public class PeerMsg implements Constants{
         return this.msg;
     }
     
-    public static MessageType decodeMessageType(DataInputStream in, int numPieces) throws IOException{
+    public static PeerMsg decodeMessageType(DataInputStream in, int numPieces) throws IOException{
     	
     	int lenPrefix = in.readInt();
     	
     	if (lenPrefix == 0)
-    		return MessageType.Keep_Alive;
+    		return new PeerMsg(MessageType.Keep_Alive);
     	
     	int messageID = in.readByte();
     	
     	if(messageID == MessageType.Choke.id)
-    		return MessageType.Choke;
+    		return new PeerMsg(MessageType.Choke);
     	else if (messageID == MessageType.Un_Choke.id)
-    		return MessageType.Un_Choke;
+    		return new PeerMsg(MessageType.Un_Choke);
     	else if (messageID == MessageType.Interested.id)
-    		return MessageType.Interested;
+    		return new PeerMsg(MessageType.Interested);
     	else if (messageID == MessageType.Not_Interested.id)
-    		return MessageType.Not_Interested;
-    	else if (messageID == MessageType.Have.id){
-    		MessageType temp = MessageType.Have;
-    		temp.setPieceIndex(in.readInt());
-    		return temp;
-    	}
+    		return new PeerMsg(MessageType.Not_Interested);
+    	else if (messageID == MessageType.Have.id)
+    		return new HaveMessage(in.readInt());
+    	else if (messageID == MessageType.Request.id)
+    		return new RequestMessage(in.readInt(), in.readInt(), in.readInt());
     	else if (messageID == MessageType.BitField.id){
-    		MessageType temp = MessageType.BitField;
     		byte[] data = (numPieces % 8 == 0) ? new byte[numPieces/8] : new byte[numPieces/8 + 1];	
     		in.readFully(data);
-    		temp.setData(data);
-    		return temp;
-    	}
-    	else if (messageID == MessageType.Request.id){
-    		MessageType temp = MessageType.Request;
-    		temp.setPieceIndex(in.readInt());
-    		temp.setBegin(in.readInt());
-    		temp.setLength(in.readInt());
-    		return temp;
+    		return new BitfieldMessage(data);
     	}
     	else if (messageID == MessageType.Piece.id){
-    		MessageType temp = MessageType.Piece;
-    		temp.setPieceIndex(in.readInt());
-    		temp.setBegin(in.readInt());
-    		temp.lenPref = (byte) (9 + (numPieces / 8));
+    		int lenPref = (byte) (9 + (numPieces / 8));
     		byte[] data = new byte[lenPrefix - 9];
 			in.readFully(data);
-			temp.setBlock(data);
-    		return temp;
+    		return new PieceMessage(in.readInt(), in.readInt(), data, lenPref);
     	}
 		return null;
-    }
-
-    /**
-     * Set payload of this message.
-     * @param reqLen
-     * @param reqStart
-     * @param reqIndex
-     */
-    public void setPayload(int reqLen, int reqStart, int reqIndex){
-        if(this.mtype == MessageType.Request){
-        	System.arraycopy(Converter.intToByteArr(reqIndex),0,this.msg,5,4);
-            System.arraycopy(Converter.intToByteArr(reqStart),0,this.msg,9,4);
-            System.arraycopy(Converter.intToByteArr(reqLen),0,this.msg,13,4);
-        }
     }
 
     /**

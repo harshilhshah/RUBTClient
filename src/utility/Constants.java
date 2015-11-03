@@ -69,39 +69,6 @@ public interface Constants {
 		
 		public final byte id;
 		public byte lenPref;
-		public int pieceIndex;
-		public byte[] data;
-		public int begin;
-		public int length;
-		public byte[] block;
-		
-		/**
-		 * @param data the data to set
-		 */
-		public void setData(byte[] data) {
-			this.data = data;
-		}
-		/**
-		 * @param begin the begin to set
-		 */
-		public void setBegin(int begin) {
-			this.begin = begin;
-		}
-		/**
-		 * @param length the length to set
-		 */
-		public void setLength(int length) {
-			this.length = length;
-		}
-		/**
-		 * @param block the block to set
-		 */
-		public void setBlock(byte[] block) {
-			this.block = block;
-		}
-		public void setPieceIndex(int i){
-			this.pieceIndex = i;
-		}
 		
 		MessageType(int id){
 			this.id = (byte) id;
@@ -119,14 +86,7 @@ public interface Constants {
 		
 		@Override
 		public String toString(){
-			String ret = this.name() + ": " + this.lenPref + " " + this.id;
-			if(this.data != null)
-				ret += " " + Converter.byteArrToStr(this.data);
-			if(this.pieceIndex != 0)
-				ret += " " + String.valueOf(this.pieceIndex);
-			if(this.begin != 0)
-				ret += " " + String.valueOf(this.begin);
-			return ret;
+			return this.name() + ": " + this.lenPref + " " + this.id;
 		}
 		
 	}
