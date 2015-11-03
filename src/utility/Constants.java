@@ -68,7 +68,7 @@ public interface Constants {
 		Cancel(8);
 		
 		public final byte id;
-		public byte lenPref;
+		public int lenPref;
 		
 		MessageType(int id){
 			this.id = (byte) id;

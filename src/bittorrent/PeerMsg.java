@@ -13,12 +13,14 @@ public class PeerMsg implements Constants{
 	
     protected byte[] msg;
     protected final MessageType mtype;
+    public int pieceIndex = -1;
 	
 	public static class RequestMessage extends PeerMsg{
 
-		public RequestMessage(int reqLen, int reqStart, int reqIndex) {
+		public RequestMessage(int reqLen, int reqStart, int pieceIndex) {
 			super(MessageType.Request);
-			System.arraycopy(Converter.intToByteArr(reqIndex),0,this.msg,5,4);
+			this.pieceIndex = pieceIndex;
+			System.arraycopy(Converter.intToByteArr(pieceIndex),0,this.msg,5,4);
             System.arraycopy(Converter.intToByteArr(reqStart),0,this.msg,9,4);
             System.arraycopy(Converter.intToByteArr(reqLen),0,this.msg,13,4);
 		}
@@ -29,6 +31,7 @@ public class PeerMsg implements Constants{
 
 		public HaveMessage(int pieceIndex) {
 			super(MessageType.Have);
+			this.pieceIndex = pieceIndex;
 			System.arraycopy(Converter.intToByteArr(pieceIndex),0,this.msg,5,4);
 		}
 		
@@ -36,8 +39,9 @@ public class PeerMsg implements Constants{
 	
 	public static class PieceMessage extends PeerMsg{
 
-		public PieceMessage(int pieceIndex, int begin, byte[] block, int lenPref) {
-			super(MessageType.Piece, lenPref);
+		public PieceMessage(int pieceIndex, int begin, byte[] block) {
+			super(MessageType.Piece, 9 + block.length);
+			this.pieceIndex = pieceIndex;
 			System.arraycopy(Converter.intToByteArr(pieceIndex),0,this.msg,5,4);
 			System.arraycopy(Converter.intToByteArr(begin),0,this.msg,9,4);
 			System.arraycopy(block,0,this.msg,13,block.length);
@@ -48,7 +52,7 @@ public class PeerMsg implements Constants{
 	public static class BitfieldMessage extends PeerMsg{
 
 		public BitfieldMessage(byte[] data) {
-			super(MessageType.BitField);
+			super(MessageType.BitField, data.length+1);
 			System.arraycopy(data,0,this.msg,5,data.length);
 		}
 		
@@ -74,7 +78,7 @@ public class PeerMsg implements Constants{
      */
     public PeerMsg(MessageType type, int lenPref){
     	this.mtype = type;
-    	this.mtype.lenPref = (byte) lenPref;
+    	this.mtype.lenPref = lenPref;
     	this.msg = new byte[mtype.lenPref + 4];
     	System.arraycopy(Converter.intToByteArr(mtype.lenPref),0,this.msg,0,4);
         this.msg[4] = mtype.id;
@@ -115,10 +119,9 @@ public class PeerMsg implements Constants{
     		return new BitfieldMessage(data);
     	}
     	else if (messageID == MessageType.Piece.id){
-    		int lenPref = (byte) (9 + (numPieces / 8));
     		byte[] data = new byte[lenPrefix - 9];
 			in.readFully(data);
-    		return new PieceMessage(in.readInt(), in.readInt(), data, lenPref);
+    		return new PieceMessage(in.readInt(), in.readInt(), data);
     	}
 		return null;
     }

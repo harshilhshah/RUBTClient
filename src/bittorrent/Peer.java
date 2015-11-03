@@ -15,7 +15,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 
 import bittorrent.PeerMsg.RequestMessage;
 import utility.Constants;
-import utility.Converter;
 
 public class Peer implements Constants, Runnable {
 	
@@ -28,8 +27,7 @@ public class Peer implements Constants, Runnable {
 	private TrackerInfo ti;
 	private Socket socket = null;
 	private int numPieces = 0;
-	private boolean handshook;
-	private boolean[] havePieces;
+	private Shared mem;
 	private ArrayBlockingQueue<PeerMsg> requestQueue;
 	
 	public Peer(int port, String ip_address, byte[] id, TrackerInfo p) {
@@ -38,9 +36,8 @@ public class Peer implements Constants, Runnable {
 		this.peer_id = id;
 		this.ti = p;
 		this.info_hash = p.info_hash.array();
-		this.handshook = false;		
 		this.numPieces = this.ti.piece_hashes.length;
-		this.havePieces = new boolean[this.numPieces];
+		this.mem = new Shared(this.numPieces);
 		this.requestQueue = new ArrayBlockingQueue<PeerMsg>(this.numPieces);
 	}
 	
@@ -83,12 +80,6 @@ public class Peer implements Constants, Runnable {
 		return !Arrays.equals(spliced_arr,this.peer_id);
 		
 	}
-	
-	private PeerMsg generateRequest(){
-		PeerMsg m = new PeerMsg(MessageType.Request);
-		
-		return m;
-	}
 
 	
 	/**
@@ -114,7 +105,7 @@ public class Peer implements Constants, Runnable {
 			
 			for(int counter = 0; counter < limit; counter++){
 				
-				if(havePieces[counter/2])
+				if(this.mem.have[counter/2])
 					continue;
 				
 				if(counter == limit-1)
@@ -125,9 +116,9 @@ public class Peer implements Constants, Runnable {
 				int start = (counter%2) * rLen;
 				
 				writeMessage(new RequestMessage(rLen, start, counter/2));
-				System.out.println(PeerMsg.decodeMessageType(in,this.numPieces));
-				//readMessage(13); // don't care about <length-prefix><7> and <index><begin>
-				//System.arraycopy(readMessage(rLen), 0, thefile, bytesWritten, rLen);
+				PeerMsg ret = PeerMsg.decodeMessageType(in,this.numPieces);
+				
+				this.mem.put(Arrays.copyOfRange(ret.msg, 9, ret.msg.length), start, counter/2, ti.piece_length);
 				this.ti.setDownloaded(bytesWritten);
 				bytesWritten += rLen;
 				System.out.println("Downloading from peer " + this.ip);
@@ -174,19 +165,6 @@ public class Peer implements Constants, Runnable {
 		this.out.write(pm.getMessage());
 		this.out.flush();
 	}
-	
-	/**
-	 * This method reads the peer response
-	 * @param int
-	 * @return byte[]
-	 */
-	private byte[] readMessage(int len) throws IOException{
-		byte[] bArr = new byte[len];
-		for(int i=0; i < len; i++)
-			bArr[i] = this.in.readByte();
-		return bArr;
-	}
-
 
 	@Override
 	public void run() {
