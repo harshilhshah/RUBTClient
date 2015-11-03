@@ -26,6 +26,7 @@ public class RUBTClient implements Constants {
 	static Timer announceTimer = new Timer();
 	static String output_file; 
 	private static byte[] byteArray = null;
+	private static Thread[] peer_threads = null;
 
 	public static void main(String[] args) {			
 		
@@ -84,9 +85,13 @@ public class RUBTClient implements Constants {
 		
 		if(peer_list == null)
 			printError(NO_PEERS_FOUND);
-		else
-			for(Peer p : peer_list)
-				new Thread(p).start();
+		else{
+			peer_threads = new Thread[peer_list.size()];
+			for(int i = 0; i < peer_list.size(); i++){
+				peer_threads[i] = new Thread(peer_list.get(i));
+				peer_threads[i].start();
+			}
+		}
 		
 		new Thread(new InputListener()).start();
 		announceTimer.schedule(new Announcer(), tInfo.getInterval() * 1000);
@@ -106,6 +111,10 @@ public class RUBTClient implements Constants {
 			System.out.println("Quiting the program...");
 			
 			sc.close();
+			if(peer_threads != null)
+				for(Thread t: peer_threads)
+					t.interrupt();
+					
 			try {
 				RUBTClient.tInfo.announce(Event.Stopped);
 			} catch (IOException e) {

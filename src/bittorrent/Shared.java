@@ -20,8 +20,8 @@ public class Shared {
     public void put(byte[] b, int o, int loc, int len){
     	Integer integer = new Integer(loc);
     	if(this.pieces.containsKey(integer)){
-    		this.pieces.get(integer).addData(b, o);
-    		this.have[loc] = true;
+    		if(this.pieces.get(integer).addData(b, o))
+    			this.have[loc] = true;
     	}else{
     		this.pieces.put(integer,new Piece(b,o,loc,len));
     	}
@@ -42,8 +42,11 @@ public class Shared {
     		this.loc = loc;
     	}
     	
-    	public void addData(byte[] b, int offset){
+    	public boolean addData(byte[] b, int offset){
+    		if(Arrays.copyOfRange(data, offset, b.length) == b)
+    			return false;
     		System.arraycopy(b, 0, data, offset, b.length);
+    		return false;
     	}
     	
     }

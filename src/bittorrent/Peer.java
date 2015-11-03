@@ -117,11 +117,10 @@ public class Peer implements Constants, Runnable {
 				
 				writeMessage(new RequestMessage(rLen, start, counter/2));
 				PeerMsg ret = PeerMsg.decodeMessageType(in,this.numPieces);
-				
-				this.mem.put(Arrays.copyOfRange(ret.msg, 9, ret.msg.length), start, counter/2, ti.piece_length);
+				this.mem.put(Arrays.copyOfRange(ret.msg, 13, ret.msg.length), start, counter/2, ti.piece_length);
 				this.ti.setDownloaded(bytesWritten);
 				bytesWritten += rLen;
-				System.out.println("Downloading from peer " + this.ip);
+				
 			}
 			
 		} catch (IOException e) {

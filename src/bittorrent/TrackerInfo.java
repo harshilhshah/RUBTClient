@@ -195,6 +195,21 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 		this.left = file_length - num;
 	}
 	
+	/**
+	 * @return the uploaded
+	 */
+	int getUploaded() {
+		return uploaded;
+	}
+
+
+	/**
+	 * @param uploaded the uploaded to set
+	 */
+	void setUploaded(int uploaded) {
+		this.uploaded += uploaded;
+	}
+	
 	public TorrentInfo getTorrentInfo(){
 		return (TorrentInfo)this;
 	}

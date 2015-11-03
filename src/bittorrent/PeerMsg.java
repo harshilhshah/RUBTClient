@@ -14,12 +14,16 @@ public class PeerMsg implements Constants{
     protected byte[] msg;
     protected final MessageType mtype;
     public int pieceIndex = -1;
+    public int begin = -1;
+    public int reqLen = -1;
 	
 	public static class RequestMessage extends PeerMsg{
 
 		public RequestMessage(int reqLen, int reqStart, int pieceIndex) {
 			super(MessageType.Request);
 			this.pieceIndex = pieceIndex;
+			this.begin = reqStart;
+			this.reqLen = reqLen;
 			System.arraycopy(Converter.intToByteArr(pieceIndex),0,this.msg,5,4);
             System.arraycopy(Converter.intToByteArr(reqStart),0,this.msg,9,4);
             System.arraycopy(Converter.intToByteArr(reqLen),0,this.msg,13,4);
