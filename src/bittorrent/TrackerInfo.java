@@ -194,5 +194,9 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 		this.downloaded = num;
 		this.left = file_length - num;
 	}
+	
+	public TorrentInfo getTorrentInfo(){
+		return (TorrentInfo)this;
+	}
 
 }

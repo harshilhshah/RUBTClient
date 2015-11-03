@@ -8,9 +8,13 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import utility.Constants;
+import utility.Converter;
 
 public class Peer implements Constants, Runnable {
 	
@@ -20,15 +24,36 @@ public class Peer implements Constants, Runnable {
 	private byte[] peer_id;
 	private DataInputStream in;
 	private DataOutputStream out;
-	private TrackerInfo p;
+	private TrackerInfo ti;
 	private Socket socket = null;
+	private int numPieces = 0;
+	private boolean handshook;
+	private boolean[] havePieces;
+	private ArrayBlockingQueue<PeerMsg> requestQueue;
 	
 	public Peer(int port, String ip_address, byte[] id, TrackerInfo p) {
 		this.port = port;
 		this.ip = ip_address;
 		this.peer_id = id;
-		this.p = p;
+		this.ti = p;
 		this.info_hash = p.info_hash.array();
+		this.handshook = false;		
+		this.numPieces = this.ti.piece_hashes.length;
+		this.havePieces = new boolean[this.numPieces];
+		this.requestQueue = new ArrayBlockingQueue<PeerMsg>(this.numPieces);
+	}
+	
+	public void connect() throws UnknownHostException, IOException{
+			this.socket = new Socket(this.ip, this.port);
+			try{
+				this.socket.setSoTimeout(ti.getInterval()*1000);
+			}catch(SocketException se){
+				System.out.println("Connection timed with peer " + this.peer_id);
+			}
+			this.in = new DataInputStream(this.socket.getInputStream());
+			this.out = new DataOutputStream(this.socket.getOutputStream());
+			System.out.println("Connection established with peer " + this.peer_id);
+			
 	}
 	
 	
@@ -57,6 +82,12 @@ public class Peer implements Constants, Runnable {
 		return !Arrays.equals(spliced_arr,this.peer_id);
 		
 	}
+	
+	private PeerMsg generateRequest(){
+		PeerMsg m = new PeerMsg(MessageType.Request);
+		
+		return m;
+	}
 
 	
 	/**
@@ -64,43 +95,44 @@ public class Peer implements Constants, Runnable {
 	 * @return byte[]
 	 */
 	private byte[] startMessaging() {
-		// Optional: send bitfield message, but I didn't
-		byte[] thefile = new byte[p.file_length];
+		
+		byte[] thefile = new byte[ti.file_length];
 		
 		try {
 			
-			int length = this.in.readInt();
-			this.in.readByte();
-			readMessage(length-1);
+			System.out.println(PeerMsg.decodeMessageType(in,this.numPieces));
 			
 			writeMessage(new PeerMsg(MessageType.Interested));
 			
-			while(readMessage(5)[4] != 1){ // loop until peer unchokes
+			if(PeerMsg.decodeMessageType(in,this.numPieces) == MessageType.Un_Choke){
 				writeMessage(new PeerMsg(MessageType.Interested));
 			}
 			
 			int rLen = 16384;
-			int limit = p.piece_hashes.length * (p.piece_length/rLen);
+			int limit = ti.piece_hashes.length * (ti.piece_length/rLen);
 			int bytesWritten = 0;
 			
 			for(int counter = 0; counter < limit; counter++){
 				
+				if(havePieces[counter/2])
+					continue;
+				
 				if(counter == limit-1)
-					rLen = p.file_length 
-					- (p.piece_length * (p.piece_hashes.length - 1)) 
-					- ( (p.piece_length / rLen) - 1 ) * 16384;
+					rLen = ti.file_length 
+					- (ti.piece_length * (ti.piece_hashes.length - 1)) 
+					- ( (ti.piece_length / rLen) - 1 ) * 16384;
 				
 				int start = (counter%2) * rLen;
 				
 				PeerMsg m = new PeerMsg(MessageType.Request);
 				m.setPayload(rLen, start, counter/2);
 				writeMessage(m);
-				readMessage(13); // don't care about <length-prefix><7> and <index><begin>
-				System.arraycopy(readMessage(rLen), 0, thefile, bytesWritten, rLen);
-				this.p.setDownloaded(bytesWritten);
-				this.p.announce(Event.Empty);
+				System.out.println(PeerMsg.decodeMessageType(in,this.numPieces));
+				//readMessage(13); // don't care about <length-prefix><7> and <index><begin>
+				//System.arraycopy(readMessage(rLen), 0, thefile, bytesWritten, rLen);
+				this.ti.setDownloaded(bytesWritten);
 				bytesWritten += rLen;
-				
+				System.out.println("Downloading from peer " + this.ip);
 			}
 			
 		} catch (IOException e) {
@@ -139,6 +171,8 @@ public class Peer implements Constants, Runnable {
 	 * @param PeerMsg
 	 */
 	private void writeMessage(PeerMsg pm) throws IOException{
+		if (this.socket.isClosed())
+			return;
 		this.out.write(pm.getMessage());
 		this.out.flush();
 	}
@@ -160,33 +194,36 @@ public class Peer implements Constants, Runnable {
 	public void run() {
 		// create a connection
 		try {
-			this.socket = new Socket(this.ip, this.port);
-			this.socket.setSoTimeout(p.getInterval()*1000);
-			this.in = new DataInputStream(this.socket.getInputStream());
-			this.out = new DataOutputStream(this.socket.getOutputStream());
+			connect();
 			
 			// validate the info hash and then start messaging 
-			if(isValid(handshake())) 
+			if(isValid(handshake()))
 				RUBTClient.writeToFile(startMessaging());
+			else
+				this.disconnect();
 			
 		}catch (IOException e) {
 			e.printStackTrace();
 		}finally {
-			try {
-				this.in.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			try {
-				this.out.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			try {
-				this.socket.close();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			this.disconnect();
+		}
+	}
+	
+	public void disconnect(){
+		try {
+			this.in.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		try {
+			this.out.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		try {
+			this.socket.close();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.MalformedURLException;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.Scanner;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -67,10 +68,10 @@ public class RUBTClient implements Constants {
 		
 		
 		/* Making a get request and decoding the request */
+		List<Peer> peer_list = null;
 		
 		try {
-			if(tInfo.getPeers(tInfo.announce(Event.Empty)) == null)
-				printError(NO_PEERS_FOUND);
+			peer_list = tInfo.getPeers(tInfo.announce(Event.Started));
 		} catch (UnknownHostException uhe){
 			printError(uhe.getMessage());
 		} catch (MalformedURLException e) {
@@ -80,6 +81,12 @@ public class RUBTClient implements Constants {
 		} catch (BencodingException be) {
 			printError(be.getMessage());
 		}
+		
+		if(peer_list == null)
+			printError(NO_PEERS_FOUND);
+		else
+			for(Peer p : peer_list)
+				new Thread(p).start();
 		
 		new Thread(new InputListener()).start();
 		announceTimer.schedule(new Announcer(), tInfo.getInterval() * 1000);
@@ -93,8 +100,8 @@ public class RUBTClient implements Constants {
 			Scanner sc = new Scanner(System.in);
 			
 			do{
-				System.out.println("Enter \"exit\" to quit downloading.");
-			}while(!sc.nextLine().equals("quit"));
+				System.out.println("Enter \"exit\" to stop downloading.");
+			}while(!sc.nextLine().equalsIgnoreCase("exit"));
 			
 			System.out.println("Quiting the program...");
 			

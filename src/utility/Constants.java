@@ -56,6 +56,7 @@ public interface Constants {
 	 */
 	public enum MessageType{
 		
+		Keep_Alive(-1),
 		Choke(0),
 		Un_Choke(1), 
 		Interested(2), 
@@ -68,18 +69,66 @@ public interface Constants {
 		
 		public final byte id;
 		public byte lenPref;
+		public int pieceIndex;
+		public byte[] data;
+		public int begin;
+		public int length;
+		public byte[] block;
+		
+		/**
+		 * @param data the data to set
+		 */
+		public void setData(byte[] data) {
+			this.data = data;
+		}
+		/**
+		 * @param begin the begin to set
+		 */
+		public void setBegin(int begin) {
+			this.begin = begin;
+		}
+		/**
+		 * @param length the length to set
+		 */
+		public void setLength(int length) {
+			this.length = length;
+		}
+		/**
+		 * @param block the block to set
+		 */
+		public void setBlock(byte[] block) {
+			this.block = block;
+		}
+		public void setPieceIndex(int i){
+			this.pieceIndex = i;
+		}
 		
 		MessageType(int id){
 			this.id = (byte) id;
-			if(id == 0 || id == 1 || id == 2 || id == 3)
+			if(id > -1 && id < 4)
 				this.lenPref = 1;
 			else if(id == 4)
 				this.lenPref = 5;
+			else if(id == 5)
+				this.lenPref = 1;
 			else if(id == 6)
 				this.lenPref = 13;
 			else
 				this.lenPref = 0;
 		}
+		
+		@Override
+		public String toString(){
+			String ret = this.name() + ": " + this.lenPref + " " + this.id;
+			if(this.data != null)
+				ret += " " + Converter.byteArrToStr(this.data);
+			if(this.pieceIndex != 0)
+				ret += " " + String.valueOf(this.pieceIndex);
+			if(this.begin != 0)
+				ret += " " + String.valueOf(this.begin);
+			return ret;
+		}
+		
 	}
 	
 	public enum Event{
