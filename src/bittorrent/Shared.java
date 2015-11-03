@@ -1,54 +1,40 @@
 package bittorrent;
 
-import java.util.ArrayList;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by krupal on 11/2/2015.
  */
 public class Shared {
+	
     public boolean[] have;
-    public BlockingQueue<Piece> pieces;
+    public ConcurrentHashMap<Integer,Piece> pieces;
 
     public Shared(int size){
         this.have = new boolean[size];
-        this.pieces = new LinkedBlockingQueue<Piece>();
+        this.pieces = new ConcurrentHashMap<Integer,Piece>();
     }
 
-    public void put(byte[] b, int o, int loc){
-        this.pieces.add(new Piece(b,o,loc));
+    public void put(byte[] b, int o, int loc, int len){
+        this.pieces.put(new Integer(o),new Piece(b,o,loc,len));
+    }
+    public byte[] get(int index){
+    	Piece p = this.pieces.get(index);
+    	return (p != null && p.complete) ? p.data : null;
     }
     
     private class Piece{
-    	byte[] data;
-    	int offset;
-    	int loc;
     	
-    	public Piece(byte[] b, int o, int loc){
-    		this.data = b;
-    		this.offset = o;
-    		this.loc =loc;
+    	private byte[] data;
+    	private int loc;
+    	public boolean complete;
+    	
+    	public Piece(byte[] b, int o, int loc, int len){
+    		complete = (data != null);
+    		this.data = new byte[len];
+    		System.arraycopy(b, 0, data, o, b.length);
+    		this.loc = loc;
     	}
-    	
-		/**
-		 * @return the data
-		 */
-		byte[] getData() {
-			return data;
-		}
-		/**
-		 * @return the offset
-		 */
-		int getOffset() {
-			return offset;
-		}
-		/**
-		 * @return the loc
-		 */
-		int getLoc() {
-			return loc;
-		}
     	
     }
 }

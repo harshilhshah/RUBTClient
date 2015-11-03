@@ -2,7 +2,6 @@ package bittorrent;
 
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 
 import utility.Constants;
 import utility.Converter;
