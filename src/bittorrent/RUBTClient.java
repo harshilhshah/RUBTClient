@@ -23,10 +23,10 @@ import utility.Constants;
 public class RUBTClient implements Constants {
 	
 	static TrackerInfo tInfo;
-	static Timer announceTimer = new Timer();
-	static String output_file; 
-	private static byte[] byteArray = null;
+	private static Timer announceTimer = new Timer();
+	private static String output_file; 
 	private static Thread[] peer_threads = null;
+	private static Shared memory;
 
 	public static void main(String[] args) {			
 		
@@ -43,6 +43,7 @@ public class RUBTClient implements Constants {
 		
 		
 		/* Opening and reading the data inside the file */
+		byte[] byteArray = null;
 		
 		try{
 			File torrent_file = new File(args[0]);
@@ -86,6 +87,7 @@ public class RUBTClient implements Constants {
 		if(peer_list == null)
 			printError(NO_PEERS_FOUND);
 		else{
+			memory = new Shared(tInfo.piece_hashes.length);
 			peer_threads = new Thread[peer_list.size()];
 			for(int i = 0; i < peer_list.size(); i++){
 				peer_threads[i] = new Thread(peer_list.get(i));
@@ -94,8 +96,8 @@ public class RUBTClient implements Constants {
 		}
 		
 		new Thread(new InputListener()).start();
-		announceTimer.schedule(new Announcer(), tInfo.getInterval() * 1000);
-		
+		announceTimer.schedule(new Announcer(), tInfo.getInterval() * 100);
+
 	}
 	
 	private static class InputListener implements Runnable{
@@ -114,7 +116,7 @@ public class RUBTClient implements Constants {
 			if(peer_threads != null)
 				for(Thread t: peer_threads)
 					t.interrupt();
-					
+			RUBTClient.writeToFile(RUBTClient.memory.getAllData(RUBTClient.tInfo.file_length));	
 			try {
 				RUBTClient.tInfo.announce(Event.Stopped);
 			} catch (IOException e) {
@@ -131,13 +133,13 @@ public class RUBTClient implements Constants {
 		@Override
 		public void run() {
 			TrackerInfo ti = tInfo;
-			System.out.println(ti.getInterval());
+			System.out.println((int)(ti.getDownloaded()*1.0/ti.file_length*100) + "% complete.");
 			try {
 				ti.updateIntervals(ti.announce(Event.Empty));
 			} catch (IOException | BencodingException e) {
 				e.printStackTrace();
 			} 
-			announceTimer.schedule(new Announcer(), ti.getMin_interval() * 1000);
+			announceTimer.schedule(new Announcer(), ti.getMin_interval() * 500);
 		}
 
 	}
@@ -154,7 +156,9 @@ public class RUBTClient implements Constants {
 		System.exit(1);
 	}
 	
-	
+	public static Shared getMemory(){
+		return memory;
+	}
 	
 		
 	/**
