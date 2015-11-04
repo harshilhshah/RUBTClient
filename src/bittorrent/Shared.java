@@ -12,16 +12,20 @@ public class Shared {
     public ConcurrentHashMap<Integer,Piece> pieces;
 
     public Shared(int size){
-        this.have = new boolean[size];
+        this.have = new boolean[size]; // # of pieces = 426
         Arrays.fill(this.have, false);
         this.pieces = new ConcurrentHashMap<Integer,Piece>();
     }
 
     public void put(byte[] b, int o, int loc, int len){
     	Integer integer = new Integer(loc);
+    	if(this.have[loc])
+    		return;
     	if(this.pieces.containsKey(integer)){
-    		if(this.pieces.get(integer).addData(b, o))
+    		if(this.pieces.get(integer).addData(b, o)){
     			this.have[loc] = true;
+    			System.out.println(loc + "done");
+    		}
     	}else{
     		this.pieces.put(integer,new Piece(b,o,loc,len));
     	}
@@ -34,8 +38,10 @@ public class Shared {
     
     public byte[] getAllData(int fileSize){
     	byte[] all = new byte[fileSize];
+    	System.out.println(fileSize);
+    	System.out.println(435*16384*2);
     	for(Piece p: this.pieces.values()){
-    		System.arraycopy(p.data, 0, all, p.loc*have.length, p.data.length);
+    		System.arraycopy(p.data, 0, all, p.loc*p.data.length, p.data.length);
     	}
     	return all;
     }
@@ -55,7 +61,7 @@ public class Shared {
     		if(Arrays.copyOfRange(data, offset, b.length) == b)
     			return false;
     		System.arraycopy(b, 0, data, offset, b.length);
-    		return false;
+    		return true;
     	}
     	
     }

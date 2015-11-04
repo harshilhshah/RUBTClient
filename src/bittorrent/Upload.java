@@ -11,7 +11,7 @@ import java.nio.ByteBuffer;
 /**
  * Created by krupal on 10/27/2015.
  */
-public class Upload extends Shared implements Runnable, Constants {
+public class Upload implements Runnable, Constants {
 
     public DataInputStream din = null;
     public DataOutputStream dout = null;
@@ -19,17 +19,11 @@ public class Upload extends Shared implements Runnable, Constants {
     public InputStream in = null;
     public OutputStream out = null;
 
-    private TorrentInfo ti;
-    //Shared sh;
-
-    public Upload(Socket s, int size, TorrentInfo ti) throws Exception {
-        //this.sh = new Shared(size);
-        super(size);
+    public Upload(Socket s, int size) throws Exception {
         in = s.getInputStream();
         out = s.getOutputStream();
         din = new DataInputStream(in);
         dout = new DataOutputStream(out);
-        this.ti = ti;
 
     }
 
@@ -44,7 +38,7 @@ public class Upload extends Shared implements Runnable, Constants {
             return false;
         } else {
             System.arraycopy(BT_PROTOCOL, 0, recieve_msg, 1, BT_PROTOCOL.length);
-            System.arraycopy(this.ti.info_hash, 0, recieve_msg, 28, 20);
+            System.arraycopy(RUBTClient.tInfo.info_hash, 0, recieve_msg, 28, 20);
             System.arraycopy(TrackerInfo.my_peer_id, 0, recieve_msg, 48, 20);
 
             dout.write(recieve_msg);
@@ -72,9 +66,9 @@ public class Upload extends Shared implements Runnable, Constants {
         while (true) {
             if (req.mtype == MessageType.Request) {
                 req = PeerMsg.decodeMessageType(din,0);
-                if (this.have[req.pieceIndex]) {
+                if (RUBTClient.getMemory().have[req.pieceIndex]) {
                     byte[] block = new byte[req.reqLen];
-                    System.arraycopy(this.get(req.pieceIndex), req.begin, block, 0, req.reqLen);
+                    System.arraycopy(RUBTClient.getMemory().get(req.pieceIndex), req.begin, block, 0, req.reqLen);
 
                     //PeerMsg pi = new PeerMsg.PieceMessage(req.pieceIndex,req.begin,block);
                     dout.write(new PeerMsg.PieceMessage(req.pieceIndex, req.begin, block).msg);

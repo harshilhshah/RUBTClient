@@ -133,7 +133,12 @@ public class RUBTClient implements Constants {
 		@Override
 		public void run() {
 			TrackerInfo ti = tInfo;
-			System.out.println((int)(ti.getDownloaded()*1.0/ti.file_length*100) + "% complete.");
+			int complete = (int)(ti.getDownloaded()*100f/ti.file_length);
+			if(complete == 100){
+				RUBTClient.writeToFile(RUBTClient.memory.getAllData(RUBTClient.tInfo.file_length));
+				System.exit(0);
+			}
+			System.out.println(complete + "% complete.");
 			try {
 				ti.updateIntervals(ti.announce(Event.Empty));
 			} catch (IOException | BencodingException e) {

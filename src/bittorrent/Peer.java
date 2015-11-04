@@ -84,9 +84,7 @@ public class Peer implements Constants, Runnable {
 	 * This method communicates with the peer
 	 * @return byte[]
 	 */
-	private byte[] startMessaging() {
-		
-		byte[] thefile = new byte[ti.file_length];
+	private void startMessaging() {
 		
 		try {
 			
@@ -115,7 +113,11 @@ public class Peer implements Constants, Runnable {
 				
 				writeMessage(new RequestMessage(rLen, start, counter/2));
 				PeerMsg ret = PeerMsg.decodeMessageType(in,this.numPieces);
-				RUBTClient.getMemory().put(Arrays.copyOfRange(ret.msg, 13, ret.msg.length), start, counter/2, ti.piece_length);
+				
+				int passLen = (counter/2 != this.numPieces-1) ? rLen*2 : ti.file_length 
+						- (ti.piece_length * (ti.piece_hashes.length - 1)) 
+						- ( (ti.piece_length / rLen) - 1 ) * 16384;
+				RUBTClient.getMemory().put(Arrays.copyOfRange(ret.msg, 13, ret.msg.length), start, counter/2, passLen);
 				this.ti.setDownloaded(bytesWritten);
 				bytesWritten += rLen;
 				
@@ -124,8 +126,6 @@ public class Peer implements Constants, Runnable {
 		} catch (IOException e) {
 			System.out.println(e.getMessage());
 		}
-		
-		return thefile;
 		
 	}
 
@@ -171,7 +171,7 @@ public class Peer implements Constants, Runnable {
 			
 			// validate the info hash and then start messaging 
 			if(isValid(handshake()))
-				RUBTClient.writeToFile(startMessaging());
+				startMessaging();
 			else
 				this.disconnect();
 			
