@@ -26,9 +26,18 @@ public class Shared {
     		this.pieces.put(integer,new Piece(b,o,loc,len));
     	}
     }
+    
     public byte[] get(int index){
     	Piece p = this.pieces.get(index);
     	return (p != null && this.have[p.loc]) ? p.data : null;
+    }
+    
+    public byte[] getAllData(int fileSize){
+    	byte[] all = new byte[fileSize];
+    	for(Piece p: this.pieces.values()){
+    		System.arraycopy(p.data, 0, all, p.loc*have.length, p.data.length);
+    	}
+    	return all;
     }
     
     private class Piece{

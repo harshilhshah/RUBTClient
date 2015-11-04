@@ -27,7 +27,6 @@ public class Peer implements Constants, Runnable {
 	private TrackerInfo ti;
 	private Socket socket = null;
 	private int numPieces = 0;
-	private Shared mem;
 	private ArrayBlockingQueue<PeerMsg> requestQueue;
 	
 	public Peer(int port, String ip_address, byte[] id, TrackerInfo p) {
@@ -37,7 +36,6 @@ public class Peer implements Constants, Runnable {
 		this.ti = p;
 		this.info_hash = p.info_hash.array();
 		this.numPieces = this.ti.piece_hashes.length;
-		this.mem = new Shared(this.numPieces);
 		this.requestQueue = new ArrayBlockingQueue<PeerMsg>(this.numPieces);
 	}
 	
@@ -92,7 +90,7 @@ public class Peer implements Constants, Runnable {
 		
 		try {
 			
-			System.out.println(PeerMsg.decodeMessageType(in,this.numPieces));
+			PeerMsg.decodeMessageType(in,this.numPieces);
 			
 			writeMessage(new PeerMsg(MessageType.Interested));
 			
@@ -105,7 +103,7 @@ public class Peer implements Constants, Runnable {
 			
 			for(int counter = 0; counter < limit; counter++){
 				
-				if(this.mem.have[counter/2])
+				if(RUBTClient.getMemory().have[counter/2])
 					continue;
 				
 				if(counter == limit-1)
@@ -117,7 +115,7 @@ public class Peer implements Constants, Runnable {
 				
 				writeMessage(new RequestMessage(rLen, start, counter/2));
 				PeerMsg ret = PeerMsg.decodeMessageType(in,this.numPieces);
-				this.mem.put(Arrays.copyOfRange(ret.msg, 13, ret.msg.length), start, counter/2, ti.piece_length);
+				RUBTClient.getMemory().put(Arrays.copyOfRange(ret.msg, 13, ret.msg.length), start, counter/2, ti.piece_length);
 				this.ti.setDownloaded(bytesWritten);
 				bytesWritten += rLen;
 				

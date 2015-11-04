@@ -188,6 +188,10 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 	public void setMin_interval(int min_interval) {
 		this.min_interval = min_interval;
 	}
+	
+	public int getDownloaded(){
+		return this.downloaded;
+	}
 
 
 	public void setDownloaded(int num){
@@ -210,6 +214,22 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 		this.uploaded += uploaded;
 	}
 	
+	/**
+	 * @return the left
+	 */
+	int getLeft() {
+		return left;
+	}
+
+
+	/**
+	 * @param left the left to set
+	 */
+	void setLeft(int left) {
+		this.left = left;
+	}
+
+
 	public TorrentInfo getTorrentInfo(){
 		return (TorrentInfo)this;
 	}
