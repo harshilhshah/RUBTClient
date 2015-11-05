@@ -4,7 +4,7 @@ package bittorrent;
  * The RUBTClient program implements a bit torrent client that
  * downloads the file from peer and puts it in your directory.
  *
- * @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
+ * @author Harshil Shah, Krupal Suthar, Aishwarya Gondhi
  */
 
 import java.io.File;
@@ -166,7 +166,7 @@ public class RUBTClient implements Constants {
 			try {
 				RUBTClient.tInfo.announce(Event.Stopped);
 			} catch (IOException e) {}
-			
+			announceTimer.cancel();
 			System.exit(0);
 		}
 		
@@ -181,6 +181,7 @@ public class RUBTClient implements Constants {
 			
 			try {
 				ti.updateIntervals(ti.announce(Event.Empty));
+				System.out.println("Downloaded: " + ti.getDownloaded() + " Uploaded: " + ti.getUploaded());
 			} catch (IOException | BencodingException e) {
 				e.printStackTrace();
 			} 

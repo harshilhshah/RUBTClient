@@ -1,5 +1,9 @@
 package bittorrent;
 
+/**
+ * @author Harshil Shah, Krupal Suthar, Aishwarya Gondhi
+ */
+
 import java.io.DataInputStream;
 import java.io.IOException;
 

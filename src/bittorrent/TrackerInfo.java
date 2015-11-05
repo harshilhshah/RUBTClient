@@ -1,7 +1,7 @@
 package bittorrent;
 
 /**
- *  @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
+ * @author Harshil Shah, Krupal Suthar, Aishwarya Gondhi
  */
 
 import java.io.DataInputStream;

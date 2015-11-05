@@ -1,7 +1,7 @@
 package bittorrent;
 
 /**
- * @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
+ * @author Harshil Shah, Krupal Suthar, Aishwarya Gondhi
  */
 
 import java.io.DataInputStream;
@@ -99,22 +99,22 @@ public class Download implements Constants, Runnable {
 	
 		try {
 			
-			if(this.ti.getPercentDownloaded() > 0){
+			if(this.ti.getPercentDownloaded() > 0 && this.ti.getPercentDownloaded() < 100){
 				byte[] data = (numPieces % 8 == 0) ? new byte[numPieces/8] : new byte[numPieces/8 + 1];	
 		    	for(int i = 0; i < RUBTClient.getMemory().have.length; i++)
 		    		data[i/8] = (byte) ((RUBTClient.getMemory().have[i]) ? 0x80 >> (i % 8) : 0);
 		    	writeMessage(new PeerMsg.BitfieldMessage(data));
 			}
 			
-			System.out.println("Recieved " + PeerMsg.readMessage(in,this.numPieces).mtype.name());
+			PeerMsg.readMessage(in,this.numPieces).mtype.name();
 			
-			System.out.println("Sending Interested to the peer at " + ip);
 			writeMessage(new PeerMsg(MessageType.Interested));
 			
-			while(PeerMsg.readMessage(in,this.numPieces).mtype != MessageType.Un_Choke){
-				System.out.println("Peer at " + ip + " unchoked the connection. Starting requesting.");
+			while(PeerMsg.readMessage(in,this.numPieces).mtype != MessageType.Un_Choke)
 				writeMessage(new PeerMsg(MessageType.Interested));
-			}
+			
+			if(!completed)
+				System.out.println("Connection with peer:" + ip + " is now unchoked and interested. Starting to request.");
 			
 			int rLen = 16384;
 			int limit = ti.piece_hashes.length * (ti.piece_length/rLen);

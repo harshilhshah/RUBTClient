@@ -1,20 +1,24 @@
 package bittorrent;
 
+/**
+ * @author Harshil Shah, Krupal Suthar, Aishwarya Gondhi
+ */
+
 import utility.Constants;
 import utility.Converter;
 
 import java.io.*;
 import java.net.Socket;
 import java.util.Arrays;
+import java.util.Timer;
+import java.util.TimerTask;
 
-/**
- * Created by krupal on 10/27/2015.
- */
 public class Upload implements Constants, Runnable{
 
     private DataInputStream din = null;
     private DataOutputStream dout = null;
     private Socket sckt;
+	public Timer keepAliveTimer = new Timer();
 
     public Upload(Socket soc) throws IOException {
     	this.sckt = soc;
@@ -48,9 +52,11 @@ public class Upload implements Constants, Runnable{
     	for(int i = 0; i < RUBTClient.getMemory().have.length; i++)
     		data[i/8] = (byte) ((RUBTClient.getMemory().have[i]) ? 0x80 >> (i % 8) : 0); */
     	
+    	keepAliveTimer.schedule(new KeepMeAlive(), 120000);
         boolean choked = false;
         int i;
         
+        System.out.println("Sending Have messages for each piece that we have");
         for(i = 0; i < RUBTClient.getMemory().have.length; i++)
         	if(RUBTClient.getMemory().have[i])
         		writeMessage(new PeerMsg.HaveMessage(i));
@@ -58,7 +64,6 @@ public class Upload implements Constants, Runnable{
         while (!RUBTClient.terminate) {
         	PeerMsg req = PeerMsg.readMessage(din,i-1);
         	if(req == null) continue;
-        	System.out.println(req);
         	switch(req.mtype){
         		case Keep_Alive:
         			break;
@@ -81,7 +86,7 @@ public class Upload implements Constants, Runnable{
         				System.arraycopy(RUBTClient.getMemory().get(req.pieceIndex), req.begin, block, 0, req.reqLen);
         				dout.write(new PeerMsg.PieceMessage(req.pieceIndex, req.begin, block).msg);
         				RUBTClient.tInfo.setUploaded(RUBTClient.tInfo.getUploaded() + req.reqLen);
-        				System.out.println("Wrote piece message");
+        				System.out.println("Sending requested piece to peer.");
         			}
         			break;
         		default:
@@ -91,20 +96,18 @@ public class Upload implements Constants, Runnable{
     }
     
     public void disconnect(){
+    	keepAliveTimer.cancel();
     	try {
 			this.din.close();
 		} catch (IOException e) {
-			e.printStackTrace();
 		}
 		try {
 			this.dout.close();
 		} catch (IOException e) {
-			e.printStackTrace();
 		}
 		try {
 			this.sckt.close();
 		} catch (IOException e) {
-			e.printStackTrace();
 		}
     }
     
@@ -125,9 +128,22 @@ public class Upload implements Constants, Runnable{
     		try {
     			if (handShake()) this.startUpload();
     		} catch (Exception e) {
-    			e.printStackTrace();
+    			System.out.println("There was a miscommunication with the peer.");;
     		}
 	        disconnect();
+    	
+    }
+    
+    private class KeepMeAlive extends TimerTask{
+
+		@Override
+		public void run() {
+			try {
+				writeMessage(new PeerMsg(MessageType.Keep_Alive));
+			} catch (IOException e) {
+			}
+			keepAliveTimer.schedule(new KeepMeAlive(), 120000);
+		}
     	
     }
 }
