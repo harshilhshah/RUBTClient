@@ -49,11 +49,10 @@ public class Upload implements Runnable, Constants {
         writeMessage(new PeerMsg.BitfieldMessage(data));
 
 
-        PeerMsg req = PeerMsg.decodeMessageType(din, 0);
-        if (req.mtype == MessageType.BitField) {
-            PeerMsg bit = new PeerMsg(MessageType.BitField);
-            dout.write(bit.msg);
-            req = PeerMsg.decodeMessageType(din,0);
+        PeerMsg req = PeerMsg.decodeMessageType(din, numPieces);
+        if(req.mtype == MessageType.Interested){
+        	writeMessage(new PeerMsg(MessageType.Un_Choke));
+        	
         }
 
         //PeerMsg.RequestMessage pr = new PeerMsg.RequestMessage()

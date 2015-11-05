@@ -74,7 +74,7 @@ public class Download implements Constants, Runnable {
 			return false;
 		
 		spliced_arr = new byte[20];
-		System.arraycopy(handshake, 48, spliced_arr, 0, 20);
+		System.arraycopy(handshake, 28, spliced_arr, 0, 20);
 		return !Arrays.equals(spliced_arr,this.peer_id);
 		
 	}
