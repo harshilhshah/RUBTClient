@@ -15,6 +15,7 @@ import java.net.MalformedURLException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Stack;
@@ -26,10 +27,10 @@ import utility.Constants;
 public class RUBTClient implements Constants {
 	
 	static TrackerInfo tInfo;
-	static boolean fileWritten = false;
 	static boolean terminate = false;
 	static Timer announceTimer = new Timer();
 	static File output_file; 
+	static List<String> connectedPeers = new ArrayList<>();
 	
 	private static Thread[] peer_threads = null;
 	private static Shared memory;
@@ -50,6 +51,7 @@ public class RUBTClient implements Constants {
 		
 		
 		/* Opening and reading the data inside the file */
+		
 		byte[] byteArray = null;
 		
 		try{
@@ -68,7 +70,6 @@ public class RUBTClient implements Constants {
 		
 		/* Creating parser which will parse info from torrent_info */
 		
-		
 		try {
 			tInfo = new TrackerInfo(byteArray);
 		} catch (BencodingException e1) {
@@ -76,9 +77,16 @@ public class RUBTClient implements Constants {
 		}
 		
 		
-		/* Making a get request and decoding the request */
-		List<Download> peer_list = null;
+		/* Starting a thread that listens if user wants to quit.*/
+		new Thread(new InputListener()).start();
 		
+		/* Scheduling tracker announcement*/
+		announceTimer.schedule(new Announcer(), tInfo.getMin_interval() * 1000);
+		
+		
+		/* Making a get request and decoding the request */
+		
+		List<Download> peer_list = null;
 		try {
 			peer_list = tInfo.getPeers(tInfo.announce(Event.Started));
 		} catch (UnknownHostException uhe){
@@ -91,9 +99,12 @@ public class RUBTClient implements Constants {
 			printError(be.getMessage());
 		}
 		
-		if(peer_list == null)
-			printError(NO_PEERS_FOUND);
-		else{
+		
+		/* Setting up threads for each peer */
+		
+		if(peer_list == null){
+			System.out.println(NO_PEERS_FOUND);
+		}else{
 			memory = new Shared(tInfo.piece_hashes.length);
 			peer_threads = new Thread[peer_list.size()];
 			for(int i = 0; i < peer_list.size(); i++){
@@ -101,15 +112,13 @@ public class RUBTClient implements Constants {
 				peer_threads[i].start();
 			}
 		}
-		
-		new Thread(new InputListener()).start();
-		announceTimer.schedule(new Announcer(), tInfo.getMin_interval() * 1000);
 
 		ServerSocket ss;
 		try {
 			ss = new ServerSocket(TrackerInfo.port);
 			ss.setSoTimeout(100000);
-			System.out.println("Listening at port " + TrackerInfo.port);
+			System.out.println("Listening for connections on " 
+					+ ss.getInetAddress().getHostAddress() + ":" + TrackerInfo.port);
 		} catch (IOException e) {
 			System.out.println("Unable to create a server socket");
 			return;
@@ -140,8 +149,8 @@ public class RUBTClient implements Constants {
 			Scanner sc = new Scanner(System.in);
 			
 			do{
-				System.out.println("Enter \"exit\" to stop downloading.");
-			}while(!sc.nextLine().equalsIgnoreCase("exit"));
+				System.out.println("Enter \"quit\" to stop the program.");
+			}while(!sc.nextLine().equalsIgnoreCase("quit"));
 			
 			System.out.println("Quiting the program...");
 			
@@ -152,14 +161,11 @@ public class RUBTClient implements Constants {
 				for(Thread t: peer_threads)
 					t.interrupt();
 			
-			if(!fileWritten)
-				writeFile();	
+			writeFile();	
 			
 			try {
 				RUBTClient.tInfo.announce(Event.Stopped);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			} catch (IOException e) {}
 			
 			System.exit(0);
 		}
@@ -214,7 +220,6 @@ public class RUBTClient implements Constants {
 			stream = new RandomAccessFile(output_file,"rw");
 			stream.write(bytes, 0, bytes.length);	
 			System.out.println("File " + output_file + " has been saved.");
-			fileWritten = true;
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {

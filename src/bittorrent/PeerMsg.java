@@ -13,13 +13,13 @@ public class PeerMsg implements Constants{
 	
     protected byte[] msg;
     protected final MessageType mtype;
-    public int pieceIndex = -1;
-    public int begin = -1;
-    public int reqLen = -1;
+    public int pieceIndex = 0;
+    public int begin = 0;
+    public int reqLen = 0;
 	
 	public static class RequestMessage extends PeerMsg{
 
-		public RequestMessage(int reqLen, int reqStart, int pieceIndex) {
+		public RequestMessage(int pieceIndex, int reqStart, int reqLen) {
 			super(MessageType.Request);
 			this.pieceIndex = pieceIndex;
 			this.begin = reqStart;
@@ -61,10 +61,7 @@ public class PeerMsg implements Constants{
 			System.arraycopy(data,0,this.msg,5,data.length);
 		}
 		
-	}
-	
-	
-    
+	}    
     
     /**
      * Constructor for peer to send messages
@@ -97,7 +94,7 @@ public class PeerMsg implements Constants{
         return this.msg;
     }
     
-    public static PeerMsg decodeMessageType(DataInputStream in, int numPieces) throws IOException{
+    public static PeerMsg readMessage(DataInputStream in, int numPieces) throws IOException{
     	
     	int lenPrefix = in.readInt();
     	
@@ -130,39 +127,13 @@ public class PeerMsg implements Constants{
 			in.readFully(data);
     		return new PieceMessage(a,b, data);
     	}
-		return null;
-    }
-
-    /**
-     * gets payLoad of the message
-     * @return byte[]
-     */
-    public byte[] getPayLoad(){
     	
-        byte[] ans = null;
-
-        switch (mtype){
-            case Have:
-            case Piece:
-            case Request:
-                ans = new byte[mtype.lenPref -1];
-                System.arraycopy(this.msg,5,ans,0,mtype.lenPref - 1);
-                break;
-            default:
-                System.out.println("No payload required for this messsage");
-        }
-
-        return ans;
-    }
-    
-    public byte[] createBitfield(int numPieces, boolean[] haveArr){
-    	//byte[] bitfield = new byte[numPieces/8.0 == numPieces/8.0 ? numPieces/8 : numPieces/8 + 1];
-    	return null;
+		return null;
     }
     
     @Override
     public String toString(){
-		return Converter.byteArrToStr(this.msg);
+		return Converter.objToStr(this.msg);
     }
 
 }

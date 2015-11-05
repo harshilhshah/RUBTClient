@@ -1,14 +1,16 @@
 package bittorrent;
 
 import utility.Constants;
+import utility.Converter;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.Arrays;
 
 /**
  * Created by krupal on 10/27/2015.
  */
-public class Upload implements Runnable, Constants {
+public class Upload implements Constants, Runnable{
 
     private DataInputStream din = null;
     private DataOutputStream dout = null;
@@ -23,53 +25,68 @@ public class Upload implements Runnable, Constants {
 
     public boolean handShake() throws Exception {
         byte[] recieve_msg = new byte[68];
-        byte handshake = 19;
-        // Recieving msg
-        din.readFully(recieve_msg);
-        byte msgType = recieve_msg[0];
-
-        if (msgType != handshake) {
-            return false;
-        } else {
-            System.arraycopy(BT_PROTOCOL, 0, recieve_msg, 1, BT_PROTOCOL.length);
-            System.arraycopy(RUBTClient.tInfo.info_hash.array(), 0, recieve_msg, 28, 20);
-            System.arraycopy(TrackerInfo.my_peer_id, 0, recieve_msg, 48, 20);
-
-            dout.write(recieve_msg);
-            return true;
+        din.readFully(recieve_msg);   
+        String peer_id = Converter.objToStr(Arrays.copyOfRange(recieve_msg, 48,recieve_msg.length));
+        if(RUBTClient.connectedPeers.contains(peer_id) ){
+        	System.out.println("Already have a TCP connection on the download side");
+        	return false;
         }
-
+        if(!this.sckt.getRemoteSocketAddress().toString().contains("128.6.171.")){
+        	System.out.println("This program only accepts connection from Rutgers ip-addresses");
+        	return false;
+        }
+        System.arraycopy(TrackerInfo.my_peer_id, 0, recieve_msg, 48, 20);
+        dout.write(recieve_msg);
+        return recieve_msg[0] == 19;
     }
 
     public void startUpload() throws Exception {
+    	
+    	/* Stuff for bitfield (optional) 
         int numPieces = RUBTClient.tInfo.piece_hashes.length;
     	byte[] data = (numPieces % 8 == 0) ? new byte[numPieces/8] : new byte[numPieces/8 + 1];	
     	for(int i = 0; i < RUBTClient.getMemory().have.length; i++)
-    		data[i/8] = (byte) ((RUBTClient.getMemory().have[i]) ? 0x80 >> (i % 8) : 0);
-        writeMessage(new PeerMsg.BitfieldMessage(data));
-
-
-        PeerMsg req = PeerMsg.decodeMessageType(din, numPieces);
-        if(req.mtype == MessageType.Interested){
-        	writeMessage(new PeerMsg(MessageType.Un_Choke));
-        	
-        }
-
-        //PeerMsg.RequestMessage pr = new PeerMsg.RequestMessage()
-        while (true) {
-            if (req.mtype == MessageType.Request) {
-                req = PeerMsg.decodeMessageType(din,0);
-                if (RUBTClient.getMemory().have[req.pieceIndex]) {
-                    byte[] block = new byte[req.reqLen];
-                    System.arraycopy(RUBTClient.getMemory().get(req.pieceIndex), req.begin, block, 0, req.reqLen);
-
-                    //PeerMsg pi = new PeerMsg.PieceMessage(req.pieceIndex,req.begin,block);
-                    dout.write(new PeerMsg.PieceMessage(req.pieceIndex, req.begin, block).msg);
-                    // update upload
-                    RUBTClient.tInfo.setUploaded(req.reqLen);
-
-                }
-            }
+    		data[i/8] = (byte) ((RUBTClient.getMemory().have[i]) ? 0x80 >> (i % 8) : 0); */
+    	
+        boolean choked = false;
+        int i;
+        
+        for(i = 0; i < RUBTClient.getMemory().have.length; i++)
+        	if(RUBTClient.getMemory().have[i])
+        		writeMessage(new PeerMsg.HaveMessage(i));
+        
+        while (!RUBTClient.terminate) {
+        	PeerMsg req = PeerMsg.readMessage(din,i-1);
+        	if(req == null) continue;
+        	System.out.println(req);
+        	switch(req.mtype){
+        		case Keep_Alive:
+        			break;
+        		case Choke:
+        			choked = true;
+        			break;
+        		case Un_Choke:
+        			choked = false;
+        			break;
+        		case Interested:
+        			writeMessage(new PeerMsg(MessageType.Un_Choke));
+        			break;
+        		case Not_Interested:
+        			writeMessage(new PeerMsg(MessageType.Choke));
+        			choked = true;
+        			break;
+        		case Request:
+        			if (!choked && RUBTClient.getMemory().have[req.pieceIndex]) {
+        				byte[] block = new byte[req.reqLen];
+        				System.arraycopy(RUBTClient.getMemory().get(req.pieceIndex), req.begin, block, 0, req.reqLen);
+        				dout.write(new PeerMsg.PieceMessage(req.pieceIndex, req.begin, block).msg);
+        				RUBTClient.tInfo.setUploaded(RUBTClient.tInfo.getUploaded() + req.reqLen);
+        				System.out.println("Wrote piece message");
+        			}
+        			break;
+        		default:
+        			continue;
+            } 
         }
     }
     

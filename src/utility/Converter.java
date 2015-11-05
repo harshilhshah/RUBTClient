@@ -49,9 +49,11 @@ public class Converter {
 	 * @return String
 	 */
 	
-	public static String objectToStr(Object o){
+	public static String objToStr(Object o){
 		
-		if(o instanceof Integer){
+		if(o instanceof byte[]){
+			return Arrays.toString((byte[])o);
+		}else if(o instanceof Integer){
 			return String.valueOf(o);
 		} else if(o instanceof ByteBuffer){
 			try {
@@ -63,8 +65,8 @@ public class Converter {
 			
 			String retStr = "";
 			for (Object name: ((Map<?, ?>) o).keySet()){
-	            String value = objectToStr(((Map<?, ?>) o).get(name));  
-	            retStr += objectToStr(name) + ": " + value + "\n";  
+	            String value = objToStr(((Map<?, ?>) o).get(name));  
+	            retStr += objToStr(name) + ": " + value + "\n";  
 			} 
 			
 			return retStr;
@@ -72,7 +74,7 @@ public class Converter {
 			
 			String retStr = "";
 			for(Object elem: (List<?>)o){
-				retStr += objectToStr(elem) + "\n";
+				retStr += objToStr(elem) + "\n";
 			}
 			return retStr;
 		}
@@ -86,10 +88,6 @@ public class Converter {
      */
     public static byte[] intToByteArr(int value){
         return ByteBuffer.allocate(4).putInt(value).array();
-    }
-    
-    public static String byteArrToStr(byte[] byteArr){
-    	return Arrays.toString(byteArr);
     }
 
 }

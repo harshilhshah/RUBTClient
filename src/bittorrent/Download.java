@@ -8,16 +8,17 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
 import utility.Constants;
+import utility.Converter;
 
 public class Download implements Constants, Runnable {
 	
+	private static boolean completed = false;
 	private static int complete = 0;
 	private static long time = System.nanoTime();
 	
@@ -41,15 +42,12 @@ public class Download implements Constants, Runnable {
 	}
 	
 	public void connect() throws UnknownHostException, IOException{
-			this.socket = new Socket(this.ip, this.port);
-			try{
-				this.socket.setSoTimeout(ti.getInterval()*1000);
-			}catch(SocketException se){
-				System.out.println("Connection timed out with peer at " +ip);
-			}
-			this.in = new DataInputStream(this.socket.getInputStream());
-			this.out = new DataOutputStream(this.socket.getOutputStream());
-			System.out.println("Connection established with peer at " + ip);			
+		this.socket = new Socket(this.ip, this.port);
+		this.socket.setSoTimeout(ti.getInterval()*1000);
+		this.in = new DataInputStream(this.socket.getInputStream());
+		this.out = new DataOutputStream(this.socket.getOutputStream());
+		System.out.println("Setting up connection with peer at " + ip);	
+		RUBTClient.connectedPeers.add(Converter.objToStr(this.peer_id));
 	}
 	
 	
@@ -65,7 +63,7 @@ public class Download implements Constants, Runnable {
 		
 		byte[] spliced_arr = new byte[19];
 		System.arraycopy(handshake, 1, spliced_arr, 0, 19);
-		if(!Arrays.equals(spliced_arr,Download.BT_PROTOCOL))
+		if(!Arrays.equals(spliced_arr,BT_PROTOCOL))
 			return false;
 		
 		spliced_arr = new byte[20];
@@ -98,15 +96,22 @@ public class Download implements Constants, Runnable {
 	private void startMessaging() {
 		
 		Shared shm = RUBTClient.getMemory();
-		
+	
 		try {
 			
-			System.out.println("Recieved " + PeerMsg.decodeMessageType(in,this.numPieces).mtype.name());
+			if(this.ti.getPercentDownloaded() > 0){
+				byte[] data = (numPieces % 8 == 0) ? new byte[numPieces/8] : new byte[numPieces/8 + 1];	
+		    	for(int i = 0; i < RUBTClient.getMemory().have.length; i++)
+		    		data[i/8] = (byte) ((RUBTClient.getMemory().have[i]) ? 0x80 >> (i % 8) : 0);
+		    	writeMessage(new PeerMsg.BitfieldMessage(data));
+			}
+			
+			System.out.println("Recieved " + PeerMsg.readMessage(in,this.numPieces).mtype.name());
 			
 			System.out.println("Sending Interested to the peer at " + ip);
 			writeMessage(new PeerMsg(MessageType.Interested));
 			
-			while(PeerMsg.decodeMessageType(in,this.numPieces).mtype != MessageType.Un_Choke){
+			while(PeerMsg.readMessage(in,this.numPieces).mtype != MessageType.Un_Choke){
 				System.out.println("Peer at " + ip + " unchoked the connection. Starting requesting.");
 				writeMessage(new PeerMsg(MessageType.Interested));
 			}
@@ -115,7 +120,7 @@ public class Download implements Constants, Runnable {
 			int limit = ti.piece_hashes.length * (ti.piece_length/rLen);
 			int lastPieceSize = (ti.file_length - (ti.piece_length * (this.numPieces - 1)));
 			
-			for(int counter = 0; counter < limit && ti.getPercentDownloaded() != 100; counter++){
+			for(int counter = 0; counter < limit && !completed; counter++){
 				
 				if(shm.have[counter/2])
 					continue;
@@ -127,8 +132,8 @@ public class Download implements Constants, Runnable {
 				int passLen = (counter/2 != this.numPieces-1) ? rLen*2 : lastPieceSize;
 				int o = (counter%2)*16384;
 				
-				writeMessage(new PeerMsg.RequestMessage(rLen, start, counter/2));
-				PeerMsg ret = PeerMsg.decodeMessageType(in,this.numPieces);
+				writeMessage(new PeerMsg.RequestMessage(counter/2, start, rLen));
+				PeerMsg ret = PeerMsg.readMessage(in,this.numPieces);
 				
 				if(shm.put(Arrays.copyOfRange(ret.msg, 13, ret.msg.length), o, counter/2, passLen) && shm.have[counter/2]){
 					if(!isValidPiece(counter/2)){
@@ -144,9 +149,10 @@ public class Download implements Constants, Runnable {
 					}
 				}
 				
-				if(this.ti.getPercentDownloaded() == 100){							
+				if(!completed && this.ti.getPercentDownloaded() == 100){							
 					System.out.println("Time taken to download: " + 
 							(System.nanoTime() - time)/1000000000 + " seconds.");
+					completed = true;
 					RUBTClient.announceTimer.cancel();
 					RUBTClient.tInfo.announce(Event.Completed);
 					return;
@@ -154,7 +160,7 @@ public class Download implements Constants, Runnable {
 			}
 			
 		} catch (IOException e) {
-			System.out.println(e.getMessage());
+			System.out.println("Not communicating properly with the peer.");
 		}
 		
 	}
@@ -209,7 +215,7 @@ public class Download implements Constants, Runnable {
 			if(RUBTClient.tInfo.getPercentDownloaded() != 100)
 				System.out.println("There were invalid pieces sent.");
 			
-			
+			RUBTClient.connectedPeers.remove(Converter.objToStr(this.peer_id));
 			this.disconnect();
 			
 		}catch (IOException e) {

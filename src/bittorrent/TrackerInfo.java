@@ -140,7 +140,7 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 			}
 			
 			int port = ((Integer) pair.get(KEY_PORT)).intValue();
-			String ip = Converter.objectToStr(pair.get(KEY_IP));
+			String ip = Converter.objToStr(pair.get(KEY_IP));
 			byte[] peer_id = ((ByteBuffer) pair.get(KEY_PEER_ID)).array();
 			
 			if(ip.contains("128.6.171.130") || ip.contains("128.6.171.131"))
@@ -228,7 +228,7 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 	 * @param uploaded the uploaded to set
 	 */
 	void setUploaded(int uploaded) {
-		this.uploaded += uploaded;
+		this.uploaded = uploaded;
 	}
 	
 	/**
