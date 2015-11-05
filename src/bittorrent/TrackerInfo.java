@@ -15,10 +15,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import utility.Constants;
 import utility.Converter;
-import utility.Util;
 
 public class TrackerInfo extends TorrentInfo implements Constants {	
 	
@@ -30,16 +30,28 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 	private int uploaded = 0;
 	private int left;
 	private String info_hash_str;
-	private final int port;
+	protected static int port = 6881;
 	
 	public TrackerInfo(byte[] byteArray) throws BencodingException{
 		super(byteArray);
-		this.port = announce_url.getPort();
 		this.info_hash_str = Converter.bytesToURL(info_hash.array());
 		this.left = file_length;
-		my_peer_id = Util.generateMyId(20);
+		my_peer_id = generateMyId(20);
 	}
 
+	/**
+	 * This method generates a random string
+	 * @param int: length of the string to be generated
+	 * @return String
+	 */
+	public static byte[] generateMyId(int len){
+		final String alphaStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+		Random rnd = new Random();
+		StringBuilder sb = new StringBuilder( len );
+		for( int i = 0; i < len; i++ ) 
+			sb.append(alphaStr.charAt(rnd.nextInt(alphaStr.length())));
+		return sb.toString().getBytes();
+	}
 	
 	/**
 	 * This method creates a formatted url
@@ -57,7 +69,8 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 	 */
 	public byte[] announce(Event e) throws MalformedURLException, IOException {		
 
-		System.out.println("Connecting to the tracker at " + this.announce_url);
+		System.out.println("Connecting to the tracker at " 
+				+ new URL(this.announce_url.toString()).getHost() + " " + e);
 		
 		HttpURLConnection http_conn = (HttpURLConnection) getUrl(e).openConnection();
 		http_conn.setRequestMethod("GET");
@@ -91,9 +104,9 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 	 * @param byte[]: tracker response
 	 * @return List<Peer>
 	 */
-	List<Peer> getPeers(byte[] resp) throws BencodingException, UnknownHostException, IOException{
+	List<Download> getPeers(byte[] resp) throws BencodingException, UnknownHostException, IOException{
 		
-		List<Peer> peers_list = new ArrayList<Peer>();
+		List<Download> peers_list = new ArrayList<Download>();
 		
 		@SuppressWarnings("unchecked")
 		Map<ByteBuffer, Object> tracker = (Map<ByteBuffer, Object>) Bencoder2.decode(resp);
@@ -131,7 +144,7 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 			byte[] peer_id = ((ByteBuffer) pair.get(KEY_PEER_ID)).array();
 			
 			if(ip.contains("128.6.171.130") || ip.contains("128.6.171.131"))
-				peers_list.add(new Peer(port,ip,peer_id,this));
+				peers_list.add(new Download(port,ip,peer_id,this));
 		}
 		
 		return peers_list;
@@ -158,6 +171,10 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 		}
 	}
 
+	public int getPercentDownloaded(){
+		return (int)(getDownloaded()*100f/file_length);
+	}
+	
 	/**
 	 * @return the interval
 	 */

@@ -1,30 +1,24 @@
 package bittorrent;
 
-import jdk.nashorn.internal.runtime.ECMAException;
-import sun.misc.resources.Messages_es;
 import utility.Constants;
 
 import java.io.*;
 import java.net.Socket;
-import java.nio.ByteBuffer;
 
 /**
  * Created by krupal on 10/27/2015.
  */
 public class Upload implements Runnable, Constants {
 
-    public DataInputStream din = null;
-    public DataOutputStream dout = null;
-    public Socket sckt;
-    public InputStream in = null;
-    public OutputStream out = null;
+    private DataInputStream din = null;
+    private DataOutputStream dout = null;
+    private Socket sckt;
 
-    public Upload(Socket s, int size) throws Exception {
-        in = s.getInputStream();
-        out = s.getOutputStream();
-        din = new DataInputStream(in);
-        dout = new DataOutputStream(out);
-
+    public Upload(Socket soc) throws IOException {
+    	this.sckt = soc;
+    	this.din = new DataInputStream(soc.getInputStream());
+    	this.dout = new DataOutputStream(soc.getOutputStream());
+    	System.out.println("Recieved a connection from " +  this.sckt.getRemoteSocketAddress().toString());
     }
 
     public boolean handShake() throws Exception {
@@ -38,7 +32,7 @@ public class Upload implements Runnable, Constants {
             return false;
         } else {
             System.arraycopy(BT_PROTOCOL, 0, recieve_msg, 1, BT_PROTOCOL.length);
-            System.arraycopy(RUBTClient.tInfo.info_hash, 0, recieve_msg, 28, 20);
+            System.arraycopy(RUBTClient.tInfo.info_hash.array(), 0, recieve_msg, 28, 20);
             System.arraycopy(TrackerInfo.my_peer_id, 0, recieve_msg, 48, 20);
 
             dout.write(recieve_msg);
@@ -48,13 +42,13 @@ public class Upload implements Runnable, Constants {
     }
 
     public void startUpload() throws Exception {
-        //
-        PeerMsg uc = new PeerMsg(MessageType.Un_Choke);
-        dout.write(uc.msg);
+        int numPieces = RUBTClient.tInfo.piece_hashes.length;
+    	byte[] data = (numPieces % 8 == 0) ? new byte[numPieces/8] : new byte[numPieces/8 + 1];	
+    	for(int i = 0; i < RUBTClient.getMemory().have.length; i++)
+    		data[i/8] = (byte) ((RUBTClient.getMemory().have[i]) ? 0x80 >> (i % 8) : 0);
+        writeMessage(new PeerMsg.BitfieldMessage(data));
 
-        //int len = din.read();
-        //byte id = din.readByte();
-        PeerMsg pm = new PeerMsg(MessageType.Piece);
+
         PeerMsg req = PeerMsg.decodeMessageType(din, 0);
         if (req.mtype == MessageType.BitField) {
             PeerMsg bit = new PeerMsg(MessageType.BitField);
@@ -79,24 +73,45 @@ public class Upload implements Runnable, Constants {
             }
         }
     }
+    
+    public void disconnect(){
+    	try {
+			this.din.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		try {
+			this.dout.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		try {
+			this.sckt.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+    }
+    
+    /**
+	 * This method sends the given message
+	 * @param PeerMsg
+	 */
+	private void writeMessage(PeerMsg pm) throws IOException{
+		if (this.sckt.isClosed())
+			return;
+		this.dout.write(pm.getMessage());
+		this.dout.flush();
+	}
 
     @Override
     public void run() {
-        try {
-            if (handShake()) this.startUpload();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        try {
-            sckt.close();
-            din.close();
-            in.close();
-            dout.close();
-            out.close();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    		
+    		try {
+    			if (handShake()) this.startUpload();
+    		} catch (Exception e) {
+    			e.printStackTrace();
+    		}
+	        disconnect();
+    	
     }
 }

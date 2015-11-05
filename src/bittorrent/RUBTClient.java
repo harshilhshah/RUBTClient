@@ -12,9 +12,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.MalformedURLException;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Stack;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -23,10 +26,14 @@ import utility.Constants;
 public class RUBTClient implements Constants {
 	
 	static TrackerInfo tInfo;
-	private static Timer announceTimer = new Timer();
-	private static String output_file; 
+	static boolean fileWritten = false;
+	static boolean terminate = false;
+	static Timer announceTimer = new Timer();
+	static File output_file; 
+	
 	private static Thread[] peer_threads = null;
 	private static Shared memory;
+	private static Stack<Thread> uploaders = new Stack<>();
 
 	public static void main(String[] args) {			
 		
@@ -39,7 +46,7 @@ public class RUBTClient implements Constants {
 			printError(NULL_FILENAME);
 		
 		
-		output_file = args[1];
+		output_file = new File(args[1]);
 		
 		
 		/* Opening and reading the data inside the file */
@@ -70,7 +77,7 @@ public class RUBTClient implements Constants {
 		
 		
 		/* Making a get request and decoding the request */
-		List<Peer> peer_list = null;
+		List<Download> peer_list = null;
 		
 		try {
 			peer_list = tInfo.getPeers(tInfo.announce(Event.Started));
@@ -96,8 +103,34 @@ public class RUBTClient implements Constants {
 		}
 		
 		new Thread(new InputListener()).start();
-		announceTimer.schedule(new Announcer(), tInfo.getInterval() * 100);
+		announceTimer.schedule(new Announcer(), tInfo.getMin_interval() * 1000);
 
+		ServerSocket ss;
+		try {
+			ss = new ServerSocket(TrackerInfo.port);
+			ss.setSoTimeout(100000);
+			System.out.println("Listening at port " + TrackerInfo.port);
+		} catch (IOException e) {
+			System.out.println("Unable to create a server socket");
+			return;
+		}
+		
+		while(!terminate){
+			try{
+    			Socket sckt = ss.accept();
+    			uploaders.push(new Thread(new Upload(sckt)));
+    			uploaders.peek().start();
+    		}catch(IOException e){
+    			System.out.println("Server socket timed out.");
+    		}
+		}
+		while(!uploaders.isEmpty())
+			uploaders.pop().interrupt();
+		try {
+			ss.close();
+		} catch (IOException e) {
+			return;
+		}
 	}
 	
 	private static class InputListener implements Runnable{
@@ -112,11 +145,16 @@ public class RUBTClient implements Constants {
 			
 			System.out.println("Quiting the program...");
 			
+			terminate = true;
 			sc.close();
+			
 			if(peer_threads != null)
 				for(Thread t: peer_threads)
 					t.interrupt();
-			RUBTClient.writeToFile(RUBTClient.memory.getAllData(RUBTClient.tInfo.file_length));	
+			
+			if(!fileWritten)
+				writeFile();	
+			
 			try {
 				RUBTClient.tInfo.announce(Event.Stopped);
 			} catch (IOException e) {
@@ -132,19 +170,16 @@ public class RUBTClient implements Constants {
 
 		@Override
 		public void run() {
+			
 			TrackerInfo ti = tInfo;
-			int complete = (int)(ti.getDownloaded()*100f/ti.file_length);
-			if(complete == 100){
-				RUBTClient.writeToFile(RUBTClient.memory.getAllData(RUBTClient.tInfo.file_length));
-				System.exit(0);
-			}
-			System.out.println(complete + "% complete.");
+			
 			try {
 				ti.updateIntervals(ti.announce(Event.Empty));
 			} catch (IOException | BencodingException e) {
 				e.printStackTrace();
 			} 
-			announceTimer.schedule(new Announcer(), ti.getMin_interval() * 500);
+			
+			announceTimer.schedule(new Announcer(), ti.getMin_interval() * 1000);
 		}
 
 	}
@@ -170,14 +205,16 @@ public class RUBTClient implements Constants {
 	 * Makes a file specified by User and writes the bytes downloaded from peer.
 	 * @param bytes
 	 */
-	public static void writeToFile(byte[] bytes){
+	public static void writeFile(){
 		
-		File file = new File(RUBTClient.output_file);
+		byte[] bytes = memory.getAllData(tInfo.file_length, tInfo.piece_length);
 		
 		RandomAccessFile stream = null;
 		try {
-			stream = new RandomAccessFile(file,"rw");
-			stream.write(bytes, 0, bytes.length);		
+			stream = new RandomAccessFile(output_file,"rw");
+			stream.write(bytes, 0, bytes.length);	
+			System.out.println("File " + output_file + " has been saved.");
+			fileWritten = true;
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {

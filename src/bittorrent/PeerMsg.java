@@ -46,6 +46,7 @@ public class PeerMsg implements Constants{
 		public PieceMessage(int pieceIndex, int begin, byte[] block) {
 			super(MessageType.Piece, 9 + block.length);
 			this.pieceIndex = pieceIndex;
+			this.begin = begin;
 			System.arraycopy(Converter.intToByteArr(pieceIndex),0,this.msg,5,4);
 			System.arraycopy(Converter.intToByteArr(begin),0,this.msg,9,4);
 			System.arraycopy(block,0,this.msg,13,block.length);
@@ -78,7 +79,7 @@ public class PeerMsg implements Constants{
     }
     
     /**
-     * Constructor mainly for bitfield messages 
+     * Constructor mainly for bitfield and Piece messages 
      */
     public PeerMsg(MessageType type, int lenPref){
     	this.mtype = type;
@@ -123,9 +124,11 @@ public class PeerMsg implements Constants{
     		return new BitfieldMessage(data);
     	}
     	else if (messageID == MessageType.Piece.id){
+    		int a = in.readInt();
+    		int b = in.readInt();
     		byte[] data = new byte[lenPrefix - 9];
 			in.readFully(data);
-    		return new PieceMessage(in.readInt(), in.readInt(), data);
+    		return new PieceMessage(a,b, data);
     	}
 		return null;
     }
@@ -153,7 +156,7 @@ public class PeerMsg implements Constants{
     }
     
     public byte[] createBitfield(int numPieces, boolean[] haveArr){
-    	byte[] bitfield = new byte[numPieces/8.0 == numPieces/8.0 ? numPieces/8 : numPieces/8 + 1];
+    	//byte[] bitfield = new byte[numPieces/8.0 == numPieces/8.0 ? numPieces/8 : numPieces/8 + 1];
     	return null;
     }
     
