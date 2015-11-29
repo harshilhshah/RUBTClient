@@ -16,11 +16,13 @@ import java.util.Arrays;
 import utility.Constants;
 import utility.Converter;
 
-public class Download implements Constants, Runnable {
+public class Download extends Thread implements Constants {
 	
 	private static boolean completed = false;
 	private static int complete = 0;
 	private static long time = System.nanoTime();
+	private final Object GUI_INITIALIZATION_MONITOR = new Object();
+    private boolean pauseThreadFlag = false;
 	
 	private int port;
 	private String ip;
@@ -46,7 +48,7 @@ public class Download implements Constants, Runnable {
 		this.socket.setSoTimeout(ti.getInterval()*1000);
 		this.in = new DataInputStream(this.socket.getInputStream());
 		this.out = new DataOutputStream(this.socket.getOutputStream());
-		System.out.println("Setting up connection with peer at " + ip);	
+		RUBTClient.print("Setting up connection with peer at " + ip);	
 		RUBTClient.connectedPeers.add(Converter.objToStr(this.peer_id));
 	}
 	
@@ -114,13 +116,15 @@ public class Download implements Constants, Runnable {
 				writeMessage(new PeerMsg(MessageType.Interested));
 			
 			if(!completed)
-				System.out.println("Connection with peer:" + ip + " is now unchoked and interested. Starting to request.");
+				RUBTClient.print("Connection with peer:" + ip + " is now unchoked and interested. Starting to request.");
 			
 			int rLen = 16384;
 			int limit = ti.piece_hashes.length * (ti.piece_length/rLen);
 			int lastPieceSize = (ti.file_length - (ti.piece_length * (this.numPieces - 1)));
 			
-			for(int counter = 0; counter < limit && !completed; counter++){
+			for(int counter = 0; counter < limit && !completed && !this.isInterrupted(); counter++){
+				
+				checkForPaused();
 				
 				if(shm.have[counter/2])
 					continue;
@@ -137,14 +141,14 @@ public class Download implements Constants, Runnable {
 				
 				if(shm.put(Arrays.copyOfRange(ret.msg, 13, ret.msg.length), o, counter/2, passLen) && shm.have[counter/2]){
 					if(!isValidPiece(counter/2)){
-						System.out.println("Invalid piece sent. The SHA-1 hash did not match!");
+						RUBTClient.print("Invalid piece sent. The SHA-1 hash did not match!");
 						shm.remove(counter/2);
 					}else{
 						writeMessage(new PeerMsg.HaveMessage(counter/2));
 						this.ti.setDownloaded(this.ti.getDownloaded()+passLen);
 						if(this.ti.getPercentDownloaded() != complete){
 							complete = this.ti.getPercentDownloaded();
-							System.out.println(complete + "% completed.");
+							RUBTClient.updateProgress(complete);
 						}
 					}
 				}
@@ -160,7 +164,7 @@ public class Download implements Constants, Runnable {
 			}
 			
 		} catch (IOException e) {
-			System.out.println("Not communicating properly with the peer.");
+			RUBTClient.print("Not communicating properly with the peer.");
 		}
 		
 	}
@@ -210,10 +214,10 @@ public class Download implements Constants, Runnable {
 				if(isValid(handshake()))
 					startMessaging();
 				else
-					System.out.println("Handshake verification failed.");
+					RUBTClient.print("Handshake verification failed.");
 			
 			if(RUBTClient.tInfo.getPercentDownloaded() != 100)
-				System.out.println("There were invalid pieces sent.");
+				RUBTClient.print("There were invalid pieces sent.");
 			
 			RUBTClient.connectedPeers.remove(Converter.objToStr(this.peer_id));
 			this.disconnect();
@@ -224,6 +228,27 @@ public class Download implements Constants, Runnable {
 			this.disconnect();
 		}
 	}
+	
+	private void checkForPaused() {
+        synchronized (GUI_INITIALIZATION_MONITOR) {
+            while (pauseThreadFlag) {
+                try {
+                    GUI_INITIALIZATION_MONITOR.wait();
+                } catch (Exception e) {}
+            }
+        }
+    }
+	
+	public void pause() throws InterruptedException {
+        pauseThreadFlag = true;
+    }
+
+    public void resumeDownload() {
+        synchronized(GUI_INITIALIZATION_MONITOR) {
+            pauseThreadFlag = false;
+            GUI_INITIALIZATION_MONITOR.notify();
+        }
+    }
 	
 	public void disconnect(){
 		try {
@@ -241,6 +266,48 @@ public class Download implements Constants, Runnable {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * @return the completed
+	 */
+	boolean isCompleted() {
+		return completed;
+	}
+
+	/**
+	 * @return the complete
+	 */
+	static int getComplete() {
+		return complete;
+	}
+
+	/**
+	 * @return the port
+	 */
+	int getPort() {
+		return port;
+	}
+
+	/**
+	 * @return the ip
+	 */
+	public String getIp() {
+		return ip;
+	}
+
+	/**
+	 * @return the peer_id
+	 */
+	public byte[] getPeer_id() {
+		return peer_id;
+	}
+
+	/**
+	 * @return the numPieces
+	 */
+	int getNumPieces() {
+		return numPieces;
 	}
 
 }

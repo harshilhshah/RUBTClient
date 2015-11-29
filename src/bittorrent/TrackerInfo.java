@@ -69,7 +69,7 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 	 */
 	public byte[] announce(Event e) throws MalformedURLException, IOException {		
 
-		System.out.println("Connecting to the tracker at " 
+		RUBTClient.print("Connecting to the tracker at " 
 				+ new URL(this.announce_url.toString()).getHost() + " " + e);
 		
 		HttpURLConnection http_conn = (HttpURLConnection) getUrl(e).openConnection();
@@ -93,7 +93,7 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 				is.close();
 			if(baos != null)
 				baos.close();
-			System.out.println(ioe.getMessage());
+			RUBTClient.printError(ioe.getMessage());
 			throw ioe;
 		} 
 		return byteArray;

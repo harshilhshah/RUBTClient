@@ -22,8 +22,6 @@ public class Shared {
         this.have = new boolean[size]; // # of pieces = 436
         Arrays.fill(this.have, false);
         this.pieces = new ConcurrentHashMap<Integer,Piece>();
-        if(RUBTClient.output_file != null && RUBTClient.output_file.exists())
-        	readFile(RUBTClient.output_file);
     }
 
     public void readFile(File f){
