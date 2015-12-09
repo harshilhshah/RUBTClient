@@ -16,14 +16,18 @@ import java.util.Arrays;
 import utility.Constants;
 import utility.Converter;
 
-public class Download extends Thread implements Constants {
+public class Download extends Thread implements Constants, Peer {
 	
 	private static boolean completed = false;
-	private static int complete = 0;
+	private static volatile int counter = 0;
 	private static long time = System.nanoTime();
+	
 	private final Object GUI_INITIALIZATION_MONITOR = new Object();
     private boolean pauseThreadFlag = false;
-	
+    private boolean[] availablePieces;
+    private boolean choked = false;
+    private long updateTime;
+    private int lastPieceSize = 0;
 	private int port;
 	private String ip;
 	private byte[] info_hash;
@@ -41,15 +45,18 @@ public class Download extends Thread implements Constants {
 		this.ti = p;
 		this.info_hash = p.info_hash.array();
 		this.numPieces = this.ti.piece_hashes.length;
+		this.lastPieceSize = (ti.file_length - (ti.piece_length * (this.numPieces - 1)));
+		this.availablePieces = new boolean[numPieces];
 	}
 	
 	public void connect() throws UnknownHostException, IOException{
 		this.socket = new Socket(this.ip, this.port);
-		this.socket.setSoTimeout(ti.getInterval()*1000);
+		this.socket.setSoTimeout(ti.getInterval()*10000);
 		this.in = new DataInputStream(this.socket.getInputStream());
 		this.out = new DataOutputStream(this.socket.getOutputStream());
 		RUBTClient.print("Setting up connection with peer at " + ip);	
-		RUBTClient.connectedPeers.add(Converter.objToStr(this.peer_id));
+		RUBTClient.getPeers().add(Converter.objToStr(this.peer_id));
+		counter++;
 	}
 	
 	
@@ -96,11 +103,10 @@ public class Download extends Thread implements Constants {
 	 * @return byte[]
 	 */
 	private void startMessaging() {
-		
-		Shared shm = RUBTClient.getMemory();
 	
 		try {
 			
+			// write bitfield message
 			if(this.ti.getPercentDownloaded() > 0 && this.ti.getPercentDownloaded() < 100){
 				byte[] data = (numPieces % 8 == 0) ? new byte[numPieces/8] : new byte[numPieces/8 + 1];	
 		    	for(int i = 0; i < RUBTClient.getMemory().have.length; i++)
@@ -108,66 +114,91 @@ public class Download extends Thread implements Constants {
 		    	writeMessage(new PeerMsg.BitfieldMessage(data));
 			}
 			
-			PeerMsg.readMessage(in,this.numPieces).mtype.name();
-			
-			writeMessage(new PeerMsg(MessageType.Interested));
-			
-			while(PeerMsg.readMessage(in,this.numPieces).mtype != MessageType.Un_Choke)
-				writeMessage(new PeerMsg(MessageType.Interested));
-			
-			if(!completed)
-				RUBTClient.print("Connection with peer:" + ip + " is now unchoked and interested. Starting to request.");
-			
-			int rLen = 16384;
-			int limit = ti.piece_hashes.length * (ti.piece_length/rLen);
-			int lastPieceSize = (ti.file_length - (ti.piece_length * (this.numPieces - 1)));
-			
-			for(int counter = 0; counter < limit && !completed && !this.isInterrupted(); counter++){
-				
-				checkForPaused();
-				
-				if(shm.have[counter/2])
-					continue;
-				
-				if(counter == limit-1)
-					rLen = lastPieceSize - (( (ti.piece_length / rLen) - 1 ) * 16384);
-				
-				int start = (counter%2) * rLen;
-				int passLen = (counter/2 != this.numPieces-1) ? rLen*2 : lastPieceSize;
-				int o = (counter%2)*16384;
-				
-				writeMessage(new PeerMsg.RequestMessage(counter/2, start, rLen));
-				PeerMsg ret = PeerMsg.readMessage(in,this.numPieces);
-				
-				if(shm.put(Arrays.copyOfRange(ret.msg, 13, ret.msg.length), o, counter/2, passLen) && shm.have[counter/2]){
-					if(!isValidPiece(counter/2)){
-						RUBTClient.print("Invalid piece sent. The SHA-1 hash did not match!");
-						shm.remove(counter/2);
-					}else{
-						writeMessage(new PeerMsg.HaveMessage(counter/2));
-						this.ti.setDownloaded(this.ti.getDownloaded()+passLen);
-						if(this.ti.getPercentDownloaded() != complete){
-							complete = this.ti.getPercentDownloaded();
-							RUBTClient.updateProgress(complete);
-						}
-					}
-				}
-				
-				if(!completed && this.ti.getPercentDownloaded() == 100){							
-					System.out.println("Time taken to download: " + 
-							(System.nanoTime() - time)/1000000000 + " seconds.");
-					completed = true;
-					RUBTClient.announceTimer.cancel();
-					RUBTClient.tInfo.announce(Event.Completed);
-					return;
-				}
+			while(!completed && !this.isInterrupted() && this.ti.getPercentDownloaded() != 100){				
+				checkForPaused();		
+				interpretRcvdMsg(PeerMsg.readMessage(in,this.numPieces));
 			}
 			
+			completed = true;
+			RUBTClient.tInfo.announce(Event.Completed);
+			
 		} catch (IOException e) {
-			RUBTClient.print("Not communicating properly with the peer.");
+			RUBTClient.print("Miscommunication occurred with peer at " + this.ip);
 		}
 		
 	}
+	
+	
+	private void interpretRcvdMsg(PeerMsg rcvdMsg) throws IOException{
+		setLastUpdated(System.nanoTime());
+		if(rcvdMsg.mtype == MessageType.BitField){
+			evaluateBitfield(rcvdMsg);
+			writeMessage(new PeerMsg(MessageType.Interested));
+		} else if(rcvdMsg.mtype == MessageType.Un_Choke){
+			this.choked = false;
+			requestPiece();
+		} else if(rcvdMsg.mtype == MessageType.Choke){
+			this.choked = true;
+		} else if(rcvdMsg.mtype == MessageType.Piece){
+			evaluatePiece(rcvdMsg);
+			requestPiece();
+		} else if(rcvdMsg.mtype == MessageType.Have){
+			this.availablePieces[rcvdMsg.pieceIndex] = true;
+			RUBTClient.incrRare(rcvdMsg.pieceIndex);
+		} else if(rcvdMsg.mtype == MessageType.Choke){
+			this.choked = true;
+		} else{
+			writeMessage(new PeerMsg(MessageType.Keep_Alive));
+		}
+	}
+	
+	private void evaluateBitfield(PeerMsg rcvdMsg){
+		boolean[] bits = Converter.bytesToBoolean(Arrays.copyOfRange(rcvdMsg.msg, 5, rcvdMsg.msg.length));
+	    int min = (int) Math.min(availablePieces.length, bits.length);
+	    System.arraycopy(bits, 0, availablePieces, 0, min);
+	    for(int k = 0; k < availablePieces.length; k++)
+	    	if(availablePieces[k])
+	    		RUBTClient.incrRare(k);
+	}
+	
+	private void evaluatePiece(PeerMsg ret){
+		Shared shm = RUBTClient.getMemory();
+		int counter = ret.pieceIndex;
+		int o = ret.begin;
+		int passLen = (counter != this.numPieces-1) ? 16384*2 : lastPieceSize;
+		if(shm.put(Arrays.copyOfRange(ret.msg, 13, ret.msg.length), o, counter, passLen) && shm.have[counter])
+			if(!isValidPiece(counter)){
+				RUBTClient.print("Invalid piece sent. The SHA-1 hash did not match!");
+				shm.remove(counter);
+			}else{
+				this.ti.setDownloaded(this.ti.getDownloaded()+passLen);
+			}
+	}
+	
+	private void requestPiece() throws IOException{
+		
+		Shared shm = RUBTClient.getMemory();
+		int rLen = 16384;
+		int limit = ti.piece_hashes.length * (ti.piece_length/rLen);
+		
+		for(int counter = 0; counter < limit; counter++){
+			if (shm.have[counter/2]) 
+				continue;
+			if(counter == limit-1) // if we are requesting the last piece
+				rLen = lastPieceSize - (( (ti.piece_length / rLen) - 1 ) * 16384);
+			int start = (counter%2) * 16384;
+			writeMessage(new PeerMsg.RequestMessage(counter/2, start, rLen));
+		}
+	}
+	
+	
+	/*private void requestPiece() throws IOException{
+		int index = RUBTClient.getRarestPieceIndex(this.availablePieces);
+		if (index == -1) return;
+		int rLen = (index != numPieces - 1) ? 16384 : lastPieceSize - 16384;
+		writeMessage(new PeerMsg.RequestMessage(index, 0, rLen));
+		writeMessage(new PeerMsg.RequestMessage(index, 16384, rLen));
+	}*/
 
 	
 	/**
@@ -192,6 +223,24 @@ public class Download extends Thread implements Constants {
 		
 	}
 	
+	public boolean isChoked(){
+		return choked;
+	}
+	
+	@Override
+	public void choke(){
+		try {
+			writeMessage(new PeerMsg(MessageType.Choke));
+		} catch (IOException e) {}
+	}
+	
+	@Override
+	public void unchoke(){
+		try {
+			writeMessage(new PeerMsg(MessageType.Un_Choke));
+		} catch (IOException e) {}
+	}
+	
 	/**
 	 * This method sends the given message
 	 * @param PeerMsg
@@ -205,8 +254,9 @@ public class Download extends Thread implements Constants {
 
 	@Override
 	public void run() {
-		// create a connection
+		
 		try {
+			
 			connect();
 			
 			// validate the info hash and then start messaging 
@@ -216,14 +266,8 @@ public class Download extends Thread implements Constants {
 				else
 					RUBTClient.print("Handshake verification failed.");
 			
-			if(RUBTClient.tInfo.getPercentDownloaded() != 100)
-				RUBTClient.print("There were invalid pieces sent.");
-			
-			RUBTClient.connectedPeers.remove(Converter.objToStr(this.peer_id));
-			this.disconnect();
-			
 		}catch (IOException e) {
-			e.printStackTrace();
+			RUBTClient.print("Connection with peer at " + ip + " timed out.");
 		}finally {
 			this.disconnect();
 		}
@@ -251,21 +295,22 @@ public class Download extends Thread implements Constants {
     }
 	
 	public void disconnect(){
+		RUBTClient.print("Disconnecting from peer with ip: " + this.ip);
 		try {
 			this.in.close();
-		} catch (IOException e) {
-			e.printStackTrace();
+			counter--;
+		} catch (Exception e) {
 		}
 		try {
 			this.out.close();
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
 		}
 		try {
 			this.socket.close();
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
 		}
+		RUBTClient.getPeers().remove(Converter.objToStr(peer_id));
+		interrupt();
 	}
 
 	/**
@@ -273,13 +318,6 @@ public class Download extends Thread implements Constants {
 	 */
 	boolean isCompleted() {
 		return completed;
-	}
-
-	/**
-	 * @return the complete
-	 */
-	static int getComplete() {
-		return complete;
 	}
 
 	/**
@@ -310,4 +348,29 @@ public class Download extends Thread implements Constants {
 		return numPieces;
 	}
 
+	public static double countTime(){
+		return (System.nanoTime() - time)/1000000000;
+	}
+	
+	public static long getTime(){
+		return time;
+	}
+	
+	public static void setTime(long t){
+		time = t;
+	}
+	
+	public static int getNum(){
+		return counter;
+	}
+
+	@Override
+	public void setLastUpdated(long l) {
+		updateTime = l;
+	}
+
+	@Override
+	public long getLastUpdated() {
+		return updateTime;
+	}
 }

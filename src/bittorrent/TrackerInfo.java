@@ -26,9 +26,9 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 	
 	private int interval = 180;
 	private int min_interval = interval / 2;
-	private int downloaded = 0;
-	private int uploaded = 0;
-	private int left;
+	private long downloaded = 0;
+	private long uploaded = 0;
+	private long left;
 	private String info_hash_str;
 	protected static int port = 6881;
 	
@@ -143,8 +143,7 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 			String ip = Converter.objToStr(pair.get(KEY_IP));
 			byte[] peer_id = ((ByteBuffer) pair.get(KEY_PEER_ID)).array();
 			
-			if(ip.contains("128.6.171.130") || ip.contains("128.6.171.131"))
-				peers_list.add(new Download(port,ip,peer_id,this));
+			peers_list.add(new Download(port,ip,peer_id,this));
 		}
 		
 		return peers_list;
@@ -206,20 +205,21 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 		this.min_interval = min_interval;
 	}
 	
-	public int getDownloaded(){
+	public long getDownloaded(){
 		return this.downloaded;
 	}
 
 
-	public void setDownloaded(int num){
+	public void setDownloaded(long num){
 		this.downloaded = num;
 		this.left = file_length - num;
+		RUBTClient.updateProgress(getPercentDownloaded());
 	}
 	
 	/**
 	 * @return the uploaded
 	 */
-	int getUploaded() {
+	public long getUploaded() {
 		return uploaded;
 	}
 
@@ -227,14 +227,14 @@ public class TrackerInfo extends TorrentInfo implements Constants {
 	/**
 	 * @param uploaded the uploaded to set
 	 */
-	void setUploaded(int uploaded) {
+	void setUploaded(long uploaded) {
 		this.uploaded = uploaded;
 	}
 	
 	/**
 	 * @return the left
 	 */
-	int getLeft() {
+	long getLeft() {
 		return left;
 	}
 

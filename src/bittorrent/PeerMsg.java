@@ -10,9 +10,6 @@ import java.io.IOException;
 import utility.Constants;
 import utility.Converter;
 
-/**
- *  @author Harshil Shah, Krupal Suthar, Aishwariya Gondhi
- */
 public class PeerMsg implements Constants{
 	
     protected byte[] msg;
@@ -76,7 +73,7 @@ public class PeerMsg implements Constants{
     	this.mtype = type;
     	this.msg = new byte[mtype.lenPref + 4];
     	System.arraycopy(Converter.intToByteArr(mtype.lenPref),0,this.msg,0,4);
-        this.msg[4] = mtype.id;
+    	if(this.msg.length > 4) this.msg[4] = mtype.id;
     }
     
     /**

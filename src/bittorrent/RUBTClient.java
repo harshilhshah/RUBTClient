@@ -7,6 +7,7 @@ package bittorrent;
  * @author Harshil Shah, Krupal Suthar, Aishwarya Gondhi
  */
 
+import gui.FilePanel;
 import gui.MainView;
 
 import java.awt.EventQueue;
@@ -19,9 +20,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
-import java.util.Stack;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -33,11 +35,14 @@ public class RUBTClient implements Constants {
 	public static boolean terminate = false;
 	public static Timer announceTimer = new Timer();
 	public static File output_file; 
-	static List<String> connectedPeers = new ArrayList<>();
 	
+	private static Timer optimizer = new Timer();
+	private static List<String> connectedPeers = new ArrayList<>();
 	private static Download[] peer_threads = null;
+	private static int[] rare;
 	private static Shared memory;
-	private static Stack<Thread> uploaders = new Stack<>();
+	private static ArrayList<Upload> uploaders = new ArrayList<>();
+	private static ServerSocket ss;
 	private static MainView gui;
 	
 	public static void main(String[] args) {
@@ -65,10 +70,10 @@ public class RUBTClient implements Constants {
 		
 		
 		/* Upload */
-		ServerSocket ss;
+		
 		try {
 			ss = new ServerSocket(TrackerInfo.port);
-			ss.setSoTimeout(100000);
+			ss.setSoTimeout(3000000);
 			print("Listening for connections on " + ss.getInetAddress().getHostAddress() 
 					+ ":" + TrackerInfo.port);
 		} catch (IOException e) {
@@ -79,19 +84,63 @@ public class RUBTClient implements Constants {
 		while(!terminate){
 			try{
     			Socket sckt = ss.accept();
-    			uploaders.push(new Thread(new Upload(sckt)));
-    			uploaders.peek().start();
+    			uploaders.add(new Upload(sckt));
+    			FilePanel.updateNumSeeders();
     		}catch(IOException e){
-    			print("Server socket timed out.");
+    			print("Uploader socket timed out.");
     		}
 		}
-		while(!uploaders.isEmpty())
-			uploaders.pop().interrupt();
-		try {
-			ss.close();
-		} catch (IOException e) {
-			return;
+
+	}
+	
+	private static class OptimizedChoke extends TimerTask {
+
+		@Override
+		public void run() {
+			
+			ArrayList<Peer> peers = new ArrayList<>(uploaders);
+			List<Peer> dpeers = Arrays.asList(peer_threads);
+			peers.addAll(dpeers);
+			Peer peer_to_add = null;
+			
+			if(peers.size() > 2){
+				
+				int mi = -1;
+				int numUnChokedPeers = 0;
+				
+				// make sure we have at most 5 unchoked connections.
+				for(Peer p: peers){
+					if(p.isChoked() && numUnChokedPeers < 6){
+						p.unchoke();
+						numUnChokedPeers++;
+					} else if(!p.isChoked() && numUnChokedPeers > 5){
+						p.choke();
+						numUnChokedPeers--;
+					}
+				}
+				
+				// Find the worst unchoked peer
+				for(int j = 0; j < peers.size(); j++)
+					if(!peers.get(j).isChoked()){
+						if(mi == -1) mi = j;
+						mi = (peers.get(mi).getLastUpdated() < peers.get(j).getLastUpdated()) ? j: mi;
+						peers.get(j).setLastUpdated(0);
+						numUnChokedPeers++;
+					}
+					
+				for(Peer p: peers)
+					if(p.isChoked())
+						peer_to_add = p;
+				
+				if(mi != -1 && peer_to_add != null){
+					peers.get(mi).choke();
+					peer_to_add.unchoke();
+				}
+			}
+			
+			optimizer.schedule(new OptimizedChoke(), 30 * 1000);
 		}
+		
 	}
 	
 	private static class InputListener implements Runnable{
@@ -125,7 +174,7 @@ public class RUBTClient implements Constants {
 				e.printStackTrace();
 			} 
 			
-			announceTimer.schedule(new Announcer(), ti.getMin_interval() * 1000);
+			announceTimer.schedule(new Announcer(), ti.getInterval() * 1000);
 		}
 
 	}
@@ -151,18 +200,23 @@ public class RUBTClient implements Constants {
 	public static boolean createTrackerInfo(File f){
 		try {
 			tInfo = new TrackerInfo(readTorrentFile(f));
-			memory = new Shared(tInfo.piece_hashes.length);
-	        if(output_file != null && output_file.exists())
-	        	memory.readFile(output_file);
+			rare = new int[tInfo.piece_hashes.length];
 			return true;
 		} catch (BencodingException e1) {
 			printError(e1.getMessage() + String.format(CORRUPT_FILE,f.getName()));
 		} catch (IllegalArgumentException iae){
+		} catch (NullPointerException nil){
+			printError(INVALID_TYPE);
 		}
 		return false;
 	}
 	
 	public static void setPeerThreads(File f){
+		
+		memory = new Shared(tInfo.piece_hashes.length);
+		
+		if(output_file != null && output_file.exists())
+        	memory.readFile(output_file);
 		
 		List<Download> peer_list = null;
 		
@@ -185,9 +239,29 @@ public class RUBTClient implements Constants {
 				peer_threads[i] = peer_list.get(i);
 				peer_threads[i].start();
 			}
+			optimizer.schedule(new OptimizedChoke(), 30000);
 		}else{
 			printError(NO_PEERS_FOUND);
 		}
+	}
+	
+	public static void incrRare(int index){
+		rare[index]++;
+	}
+	
+	public synchronized static int getRarestPieceIndex(boolean[] peer_has){
+		List<Integer> intList = new ArrayList<>();
+		for(int i = 0; i < rare.length; i++)
+			intList.add(i);
+		Collections.shuffle(intList);
+		int rarestIndex = -1;
+		for (Integer i: intList) 
+			if(peer_has[i.intValue()] && !RUBTClient.getMemory().have[i.intValue()])
+				if (rarestIndex == -1)
+					rarestIndex = i.intValue();
+				else if (rare[rarestIndex] > rare[i.intValue()])
+					rarestIndex = i.intValue();
+		return rarestIndex;
 	}
 	
 	/**
@@ -211,16 +285,33 @@ public class RUBTClient implements Constants {
 	}
 	
 	static void updateProgress(int prog){
-		if(gui != null)
+		if(gui != null){
 			gui.updateProgress(prog);
-		else
-			System.out.println(prog + "% completed.");
+			return;
+		}
+		System.out.println(prog + "% completed.");
+		if(prog == 100) 				
+			System.out.println("Time taken to download: " + Download.countTime() + " seconds.");		
+	}
+	
+	public static MainView getGUI(){
+		return gui;
 	}
 	
 	public static Shared getMemory(){
 		return memory;
 	}
 	
+	public static List<String> getPeers(){
+		return connectedPeers;
+	}
+	
+	private static void stopUploaders(){
+		for(Upload u: uploaders)
+			u.disconnect();
+		try{ ss.close(); } catch(IOException e){};
+	}
+
 	public static void stopDownloaders(boolean end) {
 		if(peer_threads != null)
 			for(Download t: peer_threads)
@@ -232,9 +323,11 @@ public class RUBTClient implements Constants {
 					} catch (InterruptedException e) {
 						printError("Don't interrupt me.");
 					}
+		Download.setTime(System.nanoTime() - Download.getTime());
 	}
 	
 	public static synchronized boolean resumeDownloaders(){
+		Download.setTime(System.nanoTime() - Download.getTime());
 		if(peer_threads == null) return false;
 		for(Download t: peer_threads)
 			t.resumeDownload();
@@ -269,13 +362,17 @@ public class RUBTClient implements Constants {
 	}
 	
 	public static void quit(){
-		terminate = true;		
-		stopDownloaders(true);
-		writeFile();	
-		try {
-			tInfo.announce(Event.Stopped);
-		} catch (IOException e) {}
-		announceTimer.cancel();
+		terminate = true;	
+		if(tInfo != null){
+			stopDownloaders(true);
+			stopUploaders();
+			writeFile();	
+			try {
+				tInfo.announce(Event.Stopped);
+			} catch (IOException e) {}
+			announceTimer.cancel();
+			optimizer.cancel();
+		}
 		System.exit(0);
 	}
 

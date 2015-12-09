@@ -89,5 +89,21 @@ public class Converter {
     public static byte[] intToByteArr(int value){
         return ByteBuffer.allocate(4).putInt(value).array();
     }
+    
+    public static String readableByteCount(long bytes) {
+        int unit = 1024;
+        if (bytes < unit) return bytes + " B";
+        int exp = (int) (Math.log(bytes) / Math.log(unit));
+        String pre = "kMGT".charAt(exp-1) + "";
+        return String.format("%.1f %sB", bytes / Math.pow(unit, exp), pre);
+    }
+    
+    public static boolean[] bytesToBoolean(byte[] bytes){
+    	boolean[] bits = new boolean[bytes.length * 8];
+	    for (int i = 0; i < bytes.length * 8; i++)
+	      if ((bytes[i / 8] & (1 << (7 - (i % 8)))) > 0)
+	        bits[i] = true;
+	    return bits;
+    }
 
 }

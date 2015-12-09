@@ -42,6 +42,8 @@ public interface Constants {
 	static final String INVALID_ARGS = "Error: Invalid number of arguments\n"
 			+ "\nUsage: java cp . RUBTClient <load_file> <storage_file>";
 	static final String NULL_FILENAME = "Error: Please provide a valid file path";
+	static final String INVALID_TYPE = "Error: The file you provided is invalid. "
+			+ "It should be a torrent file.";
 	static final String FILE_NOT_FOUND  = "Error: The file %s doesn't exist. "
 			+ "\nPlease provide a valid file path name";
 	static final String CORRUPT_FILE = "Error: the file %s is corrupted.";

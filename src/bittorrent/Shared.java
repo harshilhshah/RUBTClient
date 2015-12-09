@@ -10,9 +10,6 @@ import java.io.RandomAccessFile;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Created by krupal on 11/2/2015.
- */
 public class Shared {
 	
     public boolean[] have;
@@ -27,7 +24,7 @@ public class Shared {
     public void readFile(File f){
     	RandomAccessFile fileRead = null;
 		try {
-			System.out.println("Reading data from the video file.");
+			RUBTClient.print("Reading data from the video file.");
 			fileRead = new RandomAccessFile(f,"r");
 			byte[] byteArray = new byte[(int) fileRead.length()];
 			fileRead.read(byteArray);
@@ -46,7 +43,7 @@ public class Shared {
 		    		}
 			}
 			RUBTClient.tInfo.setDownloaded(downloaded);
-			System.out.println(RUBTClient.tInfo.getPercentDownloaded()+ "% completed.");
+			RUBTClient.print(RUBTClient.tInfo.getPercentDownloaded()+ "% completed.");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
