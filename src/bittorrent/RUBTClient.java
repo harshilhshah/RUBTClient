@@ -20,7 +20,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+<<<<<<< HEAD
 import java.util.Arrays;
+=======
+>>>>>>> origin/master
 import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
@@ -30,27 +33,37 @@ import java.util.TimerTask;
 import utility.Constants;
 
 public class RUBTClient implements Constants {
-	
+
+	private static final String INVALID_TYPE = "INVALID_TYPE" ;
 	public static TrackerInfo tInfo;
 	public static boolean terminate = false;
 	public static Timer announceTimer = new Timer();
+<<<<<<< HEAD
 	public static File output_file; 
 	
 	private static Timer optimizer = new Timer();
+=======
+	public static File output_file;
+
+>>>>>>> origin/master
 	private static List<String> connectedPeers = new ArrayList<>();
 	private static Download[] peer_threads = null;
 	private static int[] rare;
 	private static Shared memory;
+<<<<<<< HEAD
 	private static ArrayList<Upload> uploaders = new ArrayList<>();
+=======
+	private static Stack<Thread> uploaders = new Stack<>();
+>>>>>>> origin/master
 	private static ServerSocket ss;
 	private static MainView gui;
-	
+
 	public static void main(String[] args) {
 		
 		/* Checking error cases */
 		if(args.length != 2 && args.length != 0)
 			printError(INVALID_ARGS);
-		
+
 		if(!(args.length == 2 && args[0] != null)){
 			EventQueue.invokeLater(new Runnable(){
 
@@ -58,31 +71,40 @@ public class RUBTClient implements Constants {
 				public void run() {
 					gui = new MainView();
 				}
-			
+
 			});
-		}else{		
-			output_file = new File(args[1]);		
+		}else{
+			output_file = new File(args[1]);
 			if(RUBTClient.createTrackerInfo(new File(args[0])))
 				RUBTClient.setPeerThreads(new File(args[0]));
 			new Thread(new InputListener()).start();
-			announceTimer.schedule(new Announcer(), tInfo.getMin_interval() * 1000);			
+			announceTimer.schedule(new Announcer(), tInfo.getMin_interval() * 1000);
 		}
 		
 		
 		/* Upload */
+<<<<<<< HEAD
 		
 		try {
 			ss = new ServerSocket(TrackerInfo.port);
 			ss.setSoTimeout(3000000);
 			print("Listening for connections on " + ss.getInetAddress().getHostAddress() 
+=======
+
+		try {
+			ss = new ServerSocket(TrackerInfo.port);
+			ss.setSoTimeout(900000);
+			print("Listening for connections on " + ss.getInetAddress().getHostAddress()
+>>>>>>> origin/master
 					+ ":" + TrackerInfo.port);
 		} catch (IOException e) {
 			print("Unable to create a server socket");
 			return;
 		}
-		
+
 		while(!terminate){
 			try{
+<<<<<<< HEAD
     			Socket sckt = ss.accept();
     			uploaders.add(new Upload(sckt));
     			FilePanel.updateNumSeeders();
@@ -141,46 +163,61 @@ public class RUBTClient implements Constants {
 			optimizer.schedule(new OptimizedChoke(), 30 * 1000);
 		}
 		
+=======
+				Socket sckt = ss.accept();
+				uploaders.push(new Thread(new Upload(sckt)));
+				uploaders.peek().start();
+			}catch(IOException e){
+				print("Uploader socket timed out.");
+			}
+		}
+
+>>>>>>> origin/master
 	}
-	
+
 	private static class InputListener implements Runnable{
 
 		@Override
 		public void run() {
 			Scanner sc = new Scanner(System.in);
-			
+
 			do{
 				System.out.println("Enter \"quit\" to stop the program.");
 			}while(!sc.nextLine().equalsIgnoreCase("quit"));
-			
+
 			System.out.println("Quiting the program...");
-			sc.close();	
+			sc.close();
 			quit();
 		}
-		
+
 	}
-	
+
 	private static class Announcer extends TimerTask {
 
 		@Override
 		public void run() {
-			
+
 			TrackerInfo ti = tInfo;
-			
+
 			try {
 				ti.updateIntervals(ti.announce(Event.Empty));
 				print("Downloaded: " + ti.getDownloaded() + " Uploaded: " + ti.getUploaded());
 			} catch (IOException | BencodingException e) {
 				e.printStackTrace();
+<<<<<<< HEAD
 			} 
 			
+=======
+			}
+
+>>>>>>> origin/master
 			announceTimer.schedule(new Announcer(), ti.getInterval() * 1000);
 		}
 
 	}
-	
+
 	private static byte[] readTorrentFile(File torrent_file){
-		
+
 		try{
 			RandomAccessFile fileRead = new RandomAccessFile(torrent_file,"r");
 			byte[] byteArray = new byte[(int) fileRead.length()];
@@ -196,7 +233,7 @@ public class RUBTClient implements Constants {
 		}
 		return null;
 	}
-	
+
 	public static boolean createTrackerInfo(File f){
 		try {
 			tInfo = new TrackerInfo(readTorrentFile(f));
@@ -210,16 +247,25 @@ public class RUBTClient implements Constants {
 		}
 		return false;
 	}
-	
+
 	public static void setPeerThreads(File f){
+<<<<<<< HEAD
 		
 		memory = new Shared(tInfo.piece_hashes.length);
 		
 		if(output_file != null && output_file.exists())
         	memory.readFile(output_file);
 		
+=======
+
+		memory = new Shared(tInfo.piece_hashes.length);
+
+		if(output_file != null && output_file.exists())
+			memory.readFile(output_file);
+
+>>>>>>> origin/master
 		List<Download> peer_list = null;
-		
+
 		try {
 			peer_list = tInfo.getPeers(tInfo.announce(Event.Started));
 		} catch (UnknownHostException uhe){
@@ -244,18 +290,30 @@ public class RUBTClient implements Constants {
 			printError(NO_PEERS_FOUND);
 		}
 	}
+<<<<<<< HEAD
 	
 	public static void incrRare(int index){
 		rare[index]++;
 	}
 	
+=======
+
+	public static void incrRare(int index){
+		rare[index]++;
+	}
+
+>>>>>>> origin/master
 	public synchronized static int getRarestPieceIndex(boolean[] peer_has){
 		List<Integer> intList = new ArrayList<>();
 		for(int i = 0; i < rare.length; i++)
 			intList.add(i);
 		Collections.shuffle(intList);
 		int rarestIndex = -1;
+<<<<<<< HEAD
 		for (Integer i: intList) 
+=======
+		for (Integer i: intList)
+>>>>>>> origin/master
 			if(peer_has[i.intValue()] && !RUBTClient.getMemory().have[i.intValue()])
 				if (rarestIndex == -1)
 					rarestIndex = i.intValue();
@@ -263,7 +321,11 @@ public class RUBTClient implements Constants {
 					rarestIndex = i.intValue();
 		return rarestIndex;
 	}
+<<<<<<< HEAD
 	
+=======
+
+>>>>>>> origin/master
 	/**
 	 * prints the given error message and exits.
 	 * @param error_message
@@ -276,31 +338,37 @@ public class RUBTClient implements Constants {
 			gui.display(error_message);
 		}
 	}
-	
+
 	static void print(String msg){
 		if(gui == null)
 			System.out.println(msg);
 		else
 			gui.display(msg);
 	}
-	
+
 	static void updateProgress(int prog){
 		if(gui != null){
 			gui.updateProgress(prog);
 			return;
 		}
 		System.out.println(prog + "% completed.");
+<<<<<<< HEAD
 		if(prog == 100) 				
 			System.out.println("Time taken to download: " + Download.countTime() + " seconds.");		
 	}
 	
 	public static MainView getGUI(){
 		return gui;
+=======
+		if(prog == 100)
+			System.out.println("Time taken to download: " + Download.countTime() + " seconds.");
+>>>>>>> origin/master
 	}
-	
+
 	public static Shared getMemory(){
 		return memory;
 	}
+<<<<<<< HEAD
 	
 	public static List<String> getPeers(){
 		return connectedPeers;
@@ -309,6 +377,16 @@ public class RUBTClient implements Constants {
 	private static void stopUploaders(){
 		for(Upload u: uploaders)
 			u.disconnect();
+=======
+
+	public static List<String> getPeers(){
+		return connectedPeers;
+	}
+
+	private static void stopUploaders(){
+		while(!uploaders.isEmpty())
+			uploaders.pop().interrupt();
+>>>>>>> origin/master
 		try{ ss.close(); } catch(IOException e){};
 	}
 
@@ -325,55 +403,81 @@ public class RUBTClient implements Constants {
 					}
 		Download.setTime(System.nanoTime() - Download.getTime());
 	}
-	
+
 	public static synchronized boolean resumeDownloaders(){
 		Download.setTime(System.nanoTime() - Download.getTime());
 		if(peer_threads == null) return false;
 		for(Download t: peer_threads)
 			t.resumeDownload();
 		return true;
- 	}
-	
+	}
+
 	/**
 	 * Makes a file specified by User and writes the bytes downloaded from peer.
 	 * @param bytes
 	 */
 	private static void writeFile(){
-		
+
 		byte[] bytes = memory.getAllData(tInfo.file_length, tInfo.piece_length);
-		
+
 		RandomAccessFile stream = null;
 		try {
 			stream = new RandomAccessFile(output_file,"rw");
-			stream.write(bytes, 0, bytes.length);	
+			stream.write(bytes, 0, bytes.length);
 			print("File " + output_file + " has been saved.");
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}finally{
-            try {
-                stream.close();
-            } catch (IOException e) {
-                printError("Already Closed.");
-            }
-        }
+			try {
+				stream.close();
+			} catch (IOException e) {
+				printError("Already Closed.");
+			}
+		}
 
 	}
-	
+
 	public static void quit(){
+<<<<<<< HEAD
 		terminate = true;	
 		if(tInfo != null){
 			stopDownloaders(true);
 			stopUploaders();
 			writeFile();	
+=======
+		terminate = true;
+		if(tInfo != null){
+			stopDownloaders(true);
+			stopUploaders();
+			writeFile();
+>>>>>>> origin/master
 			try {
 				tInfo.announce(Event.Stopped);
 			} catch (IOException e) {}
 			announceTimer.cancel();
+<<<<<<< HEAD
 			optimizer.cancel();
+=======
+>>>>>>> origin/master
 		}
 		System.exit(0);
+	}
+
+	class OptChoking extends TimerTask{
+		 	Download[] peers;
+		public OptChoking(Download[] peers){
+			this.peers = peers;
+		}
+		@Override
+		public void run() {
+
+		}
+
+		void getDownloadlen(String id){
+
+		}
 	}
 
 }
